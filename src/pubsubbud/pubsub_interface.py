@@ -9,6 +9,7 @@ class PubsubInterface(ABC):
         self._subscribed_channels: dict[str, list[str]] = {}
 
     def subscribe(self, channel_name: str, interface_id: str) -> None:
+        # TODO(handle multiple subscriptions to same channel)
         try:
             self._subscribed_channels[channel_name].append(interface_id)
         except KeyError:
