@@ -13,6 +13,7 @@ class PubsubInterface(ABC):
             self._subscribed_channels[channel_name].append(interface_id)
         except KeyError:
             self._subscribed_channels[channel_name] = [interface_id]
+        print(f"Subscribed to channel {channel_name} for interface {interface_id}")
 
     def unsubscribe(self, channel_name: str, interface_id: str) -> None:
         if interface_id:
@@ -25,6 +26,7 @@ class PubsubInterface(ABC):
     async def publish_if_subscribed(self, channel_name, content, header) -> None:
         try:
             interface_ids = self._subscribed_channels[channel_name]
+            print(f"PUBLISHING {channel_name} {interface_ids}")
             for interface_id in interface_ids:
                 await self._publish_callback(interface_id, content, header)
         except Exception:

@@ -22,7 +22,9 @@ async def main() -> None:
     cb_handler.register_callback("test_callback", callback)
     cb_handler.register_callback("test_callback", callback2)
 
-    ws_handler = websocket_handler.WebsocketHandler(ps_handler.publish)
+    ws_handler = websocket_handler.WebsocketHandler(ps_handler.publish,
+                                                    ps_handler.subscribe,
+                                                    ps_handler.unsubscribe)
 
     ps_handler.add_interface("callback", cb_handler)
     ps_handler.add_interface("websocket", ws_handler)
@@ -33,6 +35,7 @@ async def main() -> None:
     ps_handler.run()
     while True:
         await asyncio.sleep(5)
+        await ps_handler.publish("test", {"test": 1})
     # ps_handler.close()
 
 
