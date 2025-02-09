@@ -1,13 +1,10 @@
 import redis.asyncio as redis
 import asyncio
 import threading
-from typing import Callable, Any, Coroutine
+from typing import Any
 import uuid
 import json
 from pubsubbud.pubsub_interface import PubsubInterface
-
-
-AsyncCallback = Callable[[Any], Coroutine[Any, Any, Any]]
 
 
 def create_header(channel: str) -> dict[str, Any]:
@@ -25,7 +22,7 @@ class PubsubHandler:
         self._pubsub = self._redis.pubsub()
         self._setup_message_thread()
         self._canceled_event = asyncio.Event()
-        self._interfaces = {}
+        self._interfaces: dict[str, PubsubInterface] = {}
 
     async def subscribe(self, channel_name: str, interface_name: str, interface_id: str) -> None:
         self._interfaces[interface_name].subscribe(channel_name, interface_id)
@@ -33,7 +30,7 @@ class PubsubHandler:
         await self._pubsub.subscribe(f"{self._uuid}/{channel_name}")
 
     async def unsubscribe(self, channel_name: str, interface_name: str, interface_id: str) -> None:
-        self._interfaces[interface_name].unsubscribe(interface_id)
+        self._interfaces[interface_name].unsubscribe(channel_name, interface_id)
         await self._pubsub.unsubscribe(channel_name)
         await self._pubsub.unsubscribe(f"{self._uuid}/{channel_name}")
 
@@ -88,7 +85,7 @@ class PubsubHandler:
         print("Closing pubsub.")
         self._canceled_event.set()
 
-    async def publish(self, channel, data: dict[str, Any], internal=False) -> None:
+    async def publish(self, channel, data: dict[str, Any], internal: bool = False) -> None:
         message = {}
         message["content"] = data
         message["header"] = create_header(channel)

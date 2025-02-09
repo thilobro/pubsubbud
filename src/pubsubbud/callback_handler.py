@@ -1,13 +1,12 @@
-from typing import Callable, Any, Coroutine, Optional
+from typing import Any, Optional
 from pubsubbud.pubsub_interface import PubsubInterface
-
-AsyncCallback = Callable[[Any], Coroutine[Any, Any, Any]]
+from pubsubbud.custom_types import CBHandlerCallback
 
 
 class CallbackHandler(PubsubInterface):
     def __init__(self) -> None:
         super().__init__(publish_callback=self._execute_callbacks)
-        self._callbacks: dict[str, AsyncCallback] = {}
+        self._callbacks: dict[str, list[CBHandlerCallback]] = {}
 
     async def _execute_callbacks(self, interface_id: str,
                                  content: dict[str, Any], header: dict[str, Any]):
@@ -21,16 +20,16 @@ class CallbackHandler(PubsubInterface):
     async def stop(self) -> None:
         pass
 
-    def register_callback(self, interface_id: str, callback: AsyncCallback) -> None:
+    def register_callback(self, interface_id: str, callback: CBHandlerCallback) -> None:
         try:
             self._callbacks[interface_id].append(callback)
         except KeyError:
             self._callbacks[interface_id] = [callback]
 
-    def unregister_calback(self, interface_id: str, callback: Optional[AsyncCallback]) -> None:
+    def unregister_calback(self, interface_id: str, callback: Optional[CBHandlerCallback]) -> None:
         try:
             if callback:
-                self._callbacks[interface_id].pop(callback)
+                self._callbacks[interface_id].remove(callback)
                 if not self._callbacks[interface_id]:
                     del self._callbacks[interface_id]
             else:

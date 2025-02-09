@@ -3,13 +3,13 @@ import asyncio
 from typing import Any
 
 
-async def callback(content: Any, header: Any) -> bool:
+async def callback(content: dict[str, Any], header: dict[str, Any]) -> None:
     print("Executed callback")
     print(content)
     print(header)
 
 
-async def callback2(content: Any, header: Any) -> bool:
+async def callback2(content: dict[str, Any], header: dict[str, Any]) -> None:
     print("Executed callback2")
     print(content)
     print(header)
