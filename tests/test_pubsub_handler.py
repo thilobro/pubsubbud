@@ -1,4 +1,4 @@
-from pubsubbud.pubsub_handler import PubsubHandler
+from pubsubbud import pubsub_handler, callback_handler, websocket_handler
 import pytest
 from unittest.mock import AsyncMock
 
@@ -7,10 +7,12 @@ from unittest.mock import AsyncMock
 async def test_pubsub_handler():
 
     async def test_callback(content, header):
-        print("TEST")
+        print("Executed callback")
+        print(content)
+        print(header)
 
-    ps_handler = PubsubHandler()
+    ps_handler = pubsub_handler.PubsubHandler("123")
     ps_handler._pubsub = AsyncMock()
-    await ps_handler.sub_channel("test", test_callback)
+    await ps_handler.subscribe("test")
     ps_handler.run()
     ps_handler.close()

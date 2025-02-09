@@ -1,7 +1,7 @@
 import redis.asyncio as redis
 import asyncio
 import threading
-from typing import Any
+from typing import Any, Optional
 import uuid
 import json
 from pubsubbud.pubsub_interface import PubsubInterface
@@ -24,13 +24,17 @@ class PubsubHandler:
         self._canceled_event = asyncio.Event()
         self._interfaces: dict[str, PubsubInterface] = {}
 
-    async def subscribe(self, channel_name: str, interface_name: str, interface_id: str) -> None:
-        self._interfaces[interface_name].subscribe(channel_name, interface_id)
+    async def subscribe(self, channel_name: str, interface_name: Optional[str] = None,
+                        interface_id: Optional[str] = None) -> None:
+        if interface_id and interface_name:
+            self._interfaces[interface_name].subscribe(channel_name, interface_id)
         await self._pubsub.subscribe(channel_name)
         await self._pubsub.subscribe(f"{self._uuid}/{channel_name}")
 
-    async def unsubscribe(self, channel_name: str, interface_name: str, interface_id: str) -> None:
-        self._interfaces[interface_name].unsubscribe(channel_name, interface_id)
+    async def unsubscribe(self, channel_name: str, interface_name: Optional[str] = None,
+                          interface_id: Optional[str] = None) -> None:
+        if interface_id and interface_name:
+            self._interfaces[interface_name].unsubscribe(channel_name, interface_id)
         await self._pubsub.unsubscribe(channel_name)
         await self._pubsub.unsubscribe(f"{self._uuid}/{channel_name}")
 
