@@ -6,7 +6,7 @@ from unittest.mock import AsyncMock
 @pytest.mark.asyncio
 async def test_pubsub_handler():
 
-    async def test_callback(message):
+    async def test_callback(content, header):
         print("TEST")
 
     ps_handler = PubsubHandler()
