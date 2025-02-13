@@ -3,3 +3,8 @@ repos:
   rev: 25.1.0
   hooks:
   - id: black
+repos:
+  - repo: https://github.com/pycqa/isort
+    rev: 5.13.2
+    hooks:
+      - id: isort
