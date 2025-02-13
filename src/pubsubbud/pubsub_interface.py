@@ -9,8 +9,10 @@ class PubsubInterface(ABC):
         self._subscribed_channels: dict[str, list[str]] = {}
 
     def subscribe(self, channel_name: str, interface_id: str) -> None:
-        # TODO(handle multiple subscriptions to same channel)
         try:
+            if interface_id in self._subscribed_channels[channel_name]:
+                print(f"Interface {interface_id} is already subscribed to channel {channel_name}.")
+                return None
             self._subscribed_channels[channel_name].append(interface_id)
         except KeyError:
             self._subscribed_channels[channel_name] = [interface_id]
