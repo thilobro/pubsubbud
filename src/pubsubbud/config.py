@@ -1,9 +1,9 @@
-import pydantic
 import json
+
+import pydantic
 
 
 class JsonConfig(pydantic.BaseModel):
-
     @classmethod
     def from_json(cls, json_path):
         with open(json_path) as f:

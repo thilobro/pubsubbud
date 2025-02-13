@@ -1,11 +1,13 @@
-from abc import ABC, abstractmethod
-from pubsubbud.custom_types import IFPublishCallback
 import logging
+from abc import ABC, abstractmethod
+
+from pubsubbud.custom_types import IFPublishCallback
 
 
 class PubsubInterface(ABC):
-
-    def __init__(self, publish_callback: IFPublishCallback, logger: logging.Logger) -> None:
+    def __init__(
+        self, publish_callback: IFPublishCallback, logger: logging.Logger
+    ) -> None:
         self._logger = logger
         self._publish_callback = publish_callback
         self._subscribed_channels: dict[str, list[str]] = {}
@@ -14,12 +16,15 @@ class PubsubInterface(ABC):
         try:
             if interface_id in self._subscribed_channels[channel_name]:
                 self._logger.info(
-                    f"Interface {interface_id} is already subscribed to channel {channel_name}.")
+                    f"Interface {interface_id} is already subscribed to channel {channel_name}."
+                )
                 return None
             self._subscribed_channels[channel_name].append(interface_id)
         except KeyError:
             self._subscribed_channels[channel_name] = [interface_id]
-        self._logger.info(f"Subscribed to channel {channel_name} for interface {interface_id}")
+        self._logger.info(
+            f"Subscribed to channel {channel_name} for interface {interface_id}"
+        )
 
     def unsubscribe(self, channel_name: str, interface_id: str) -> None:
         if interface_id:

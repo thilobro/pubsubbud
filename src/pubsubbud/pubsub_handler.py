@@ -1,12 +1,14 @@
-import redis.asyncio as redis
 import asyncio
-import threading
-from typing import Any, Optional
-import uuid
 import json
-from pubsubbud.pubsub_interface import PubsubInterface
 import logging
+import threading
+import uuid
+from typing import Any, Optional
+
+import redis.asyncio as redis
+
 from pubsubbud.config import PubsubHandlerConfig
+from pubsubbud.pubsub_interface import PubsubInterface
 
 
 def create_header(channel: str) -> dict[str, Any]:
@@ -17,7 +19,6 @@ def create_header(channel: str) -> dict[str, Any]:
 
 
 class PubsubHandler:
-
     def __init__(self, config: PubsubHandlerConfig, logger: logging.Logger) -> None:
         self._logger = logger
         self._uuid = config.uuid
@@ -27,15 +28,23 @@ class PubsubHandler:
         self._canceled_event = asyncio.Event()
         self._interfaces: dict[str, PubsubInterface] = {}
 
-    async def subscribe(self, channel_name: str, interface_name: Optional[str] = None,
-                        interface_id: Optional[str] = None) -> None:
+    async def subscribe(
+        self,
+        channel_name: str,
+        interface_name: Optional[str] = None,
+        interface_id: Optional[str] = None,
+    ) -> None:
         if interface_id and interface_name:
             self._interfaces[interface_name].subscribe(channel_name, interface_id)
         await self._pubsub.subscribe(channel_name)
         await self._pubsub.subscribe(f"{self._uuid}/{channel_name}")
 
-    async def unsubscribe(self, channel_name: str, interface_name: Optional[str] = None,
-                          interface_id: Optional[str] = None) -> None:
+    async def unsubscribe(
+        self,
+        channel_name: str,
+        interface_name: Optional[str] = None,
+        interface_id: Optional[str] = None,
+    ) -> None:
         if interface_id and interface_name:
             self._interfaces[interface_name].unsubscribe(channel_name, interface_id)
         await self._pubsub.unsubscribe(channel_name)
@@ -92,7 +101,9 @@ class PubsubHandler:
         self._logger.info("Closing pubsub.")
         self._canceled_event.set()
 
-    async def publish(self, channel, data: dict[str, Any], internal: bool = False) -> None:
+    async def publish(
+        self, channel, data: dict[str, Any], internal: bool = False
+    ) -> None:
         message = {}
         message["content"] = data
         message["header"] = create_header(channel)

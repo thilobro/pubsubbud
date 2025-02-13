@@ -1,7 +1,8 @@
-from typing import Any, Optional
-from pubsubbud.pubsub_interface import PubsubInterface
-from pubsubbud.custom_types import CBHandlerCallback
 import logging
+from typing import Any, Optional
+
+from pubsubbud.custom_types import CBHandlerCallback
+from pubsubbud.pubsub_interface import PubsubInterface
 
 
 class CallbackHandler(PubsubInterface):
@@ -9,8 +10,9 @@ class CallbackHandler(PubsubInterface):
         super().__init__(publish_callback=self._execute_callbacks, logger=logger)
         self._callbacks: dict[str, list[CBHandlerCallback]] = {}
 
-    async def _execute_callbacks(self, interface_id: str,
-                                 content: dict[str, Any], header: dict[str, Any]):
+    async def _execute_callbacks(
+        self, interface_id: str, content: dict[str, Any], header: dict[str, Any]
+    ):
         callbacks = self._callbacks[interface_id]
         for callback in callbacks:
             await callback(content, header)
@@ -27,7 +29,9 @@ class CallbackHandler(PubsubInterface):
         except KeyError:
             self._callbacks[interface_id] = [callback]
 
-    def unregister_calback(self, interface_id: str, callback: Optional[CBHandlerCallback]) -> None:
+    def unregister_calback(
+        self, interface_id: str, callback: Optional[CBHandlerCallback]
+    ) -> None:
         try:
             if callback:
                 self._callbacks[interface_id].remove(callback)
@@ -36,4 +40,6 @@ class CallbackHandler(PubsubInterface):
             else:
                 del self._callbacks[interface_id]
         except KeyError:
-            self._logger.warning(f"Unable to unregister callbacks to interface id {interface_id}")
+            self._logger.warning(
+                f"Unable to unregister callbacks to interface id {interface_id}"
+            )

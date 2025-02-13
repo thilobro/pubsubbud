@@ -1,12 +1,19 @@
 import asyncio
-from websockets.asyncio.client import connect
 import json
 
+from websockets.asyncio.client import connect
+
 test_msg = {"type": "pubsub", "channel": "test", "data": "test2"}
-test_sub_msg = {"type": "subscription", "subscription_type": "subscription",
-                "subscription_channel": "test"}
-test_unsub_msg = {"type": "subscription", "subscription_type": "unsubscription",
-                  "subscription_channel": "test"}
+test_sub_msg = {
+    "type": "subscription",
+    "subscription_type": "subscription",
+    "subscription_channel": "test",
+}
+test_unsub_msg = {
+    "type": "subscription",
+    "subscription_type": "unsubscription",
+    "subscription_channel": "test",
+}
 
 
 async def hello():
