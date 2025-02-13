@@ -1,11 +1,12 @@
 from typing import Any, Optional
 from pubsubbud.pubsub_interface import PubsubInterface
 from pubsubbud.custom_types import CBHandlerCallback
+import logging
 
 
 class CallbackHandler(PubsubInterface):
-    def __init__(self) -> None:
-        super().__init__(publish_callback=self._execute_callbacks)
+    def __init__(self, logger: logging.Logger) -> None:
+        super().__init__(publish_callback=self._execute_callbacks, logger=logger)
         self._callbacks: dict[str, list[CBHandlerCallback]] = {}
 
     async def _execute_callbacks(self, interface_id: str,
@@ -35,4 +36,4 @@ class CallbackHandler(PubsubInterface):
             else:
                 del self._callbacks[interface_id]
         except KeyError:
-            print(f"Unable to unregister callbacks to interface id {interface_id}")
+            self._logger.warning(f"Unable to unregister callbacks to interface id {interface_id}")

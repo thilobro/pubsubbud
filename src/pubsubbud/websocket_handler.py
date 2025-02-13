@@ -7,6 +7,7 @@ from pubsubbud.pubsub_interface import PubsubInterface
 from pubsubbud.custom_types import (ProcessMessageCallback,
                                     SubscriptionCallback,
                                     UnsubscriptionCallback)
+import logging
 
 
 class WebsocketConnection:
@@ -21,8 +22,9 @@ class WebsocketHandler(PubsubInterface):
 
     def __init__(self, process_message_callback: ProcessMessageCallback,
                  subscription_callback: SubscriptionCallback,
-                 unsubscription_callback: UnsubscriptionCallback) -> None:
-        super().__init__(publish_callback=self._send)
+                 unsubscription_callback: UnsubscriptionCallback,
+                 logger: logging.Logger) -> None:
+        super().__init__(publish_callback=self._send, logger=logger)
         self._run_task: Optional[asyncio.Task] = None
         self._active_connections: dict[str, WebsocketConnection] = {}
         self._process_message_callback = process_message_callback
@@ -30,6 +32,7 @@ class WebsocketHandler(PubsubInterface):
         self._unsubscription_callback = unsubscription_callback
 
     async def _serve(self) -> None:
+        # TODO(this should come from a config file)
         async with serve(self._handle_websocket, "localhost", 8765) as server:
             await server.serve_forever()
 
@@ -62,7 +65,7 @@ class WebsocketHandler(PubsubInterface):
             self._connect(websocket)
             async for message in websocket:
                 message = json.loads(message)
-                print(f"Message received: {message}")
+                self._logger.info(f"Message received: {message}")
                 message_type = message["type"]
                 if message_type == "subscription":
                     await self._handle_subscription_message(message, websocket.id)
@@ -70,7 +73,7 @@ class WebsocketHandler(PubsubInterface):
                     await self._handle_pubsub_message(message)
         except (websockets.exceptions.ConnectionClosedError,
                 websockets.exceptions.ConnectionClosedOK):
-            print("ERROR in websocket")
+            self._logger.error(f"Error in websocket handler.", exc_info=True)
         finally:
             self._disconnect(websocket)
 

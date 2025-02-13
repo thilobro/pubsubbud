@@ -5,6 +5,7 @@ from typing import Any, Optional
 import uuid
 import json
 from pubsubbud.pubsub_interface import PubsubInterface
+import logging
 
 
 def create_header(channel: str) -> dict[str, Any]:
@@ -16,7 +17,8 @@ def create_header(channel: str) -> dict[str, Any]:
 
 class PubsubHandler:
 
-    def __init__(self, uuid: str) -> None:
+    def __init__(self, uuid: str, logger: logging.Logger) -> None:
+        self._logger = logger
         self._uuid = uuid
         self._redis = redis.Redis()
         self._pubsub = self._redis.pubsub()
@@ -60,7 +62,7 @@ class PubsubHandler:
         try:
             await message_task
         except asyncio.CancelledError:
-            print("Pubsub cancelled.")
+            self._logger.info("Pubsub cancelled.")
             if not message_task.cancelled():
                 message_task.cancel()
 
@@ -68,7 +70,7 @@ class PubsubHandler:
         while not self._canceled_event.is_set():
             message = await self._pubsub.get_message()
             if message and not message["type"] == "subscribe":
-                print(f"From redis: {message}")
+                self._logger.debug(f"Message from redis: {message}")
                 channel = message["channel"].decode()
                 if "/" in channel:
                     channel = channel.split("/")[1]
@@ -86,7 +88,7 @@ class PubsubHandler:
         self._interfaces[name] = interface
 
     def close(self) -> None:
-        print("Closing pubsub.")
+        self._logger.info("Closing pubsub.")
         self._canceled_event.set()
 
     async def publish(self, channel, data: dict[str, Any], internal: bool = False) -> None:
@@ -95,7 +97,7 @@ class PubsubHandler:
         message["header"] = create_header(channel)
         if internal:
             channel = f"{self._uuid}/{channel}"
-        print(f"To redis: {message}, {channel}")
+        self._logger.debug(f"Message to redis: {message}, {channel}")
         await self._redis.publish(channel, json.dumps(message))
 
     @property
