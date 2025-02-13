@@ -25,6 +25,9 @@ jobs:
         python -m pip install --upgrade pip
         pip install poetry
         poetry install
+    - name: pre-commit
+      run: |
+        poetry run pre-commit run --all-files
     - name: Mypy
       run: |
         poetry run mypy ./src
