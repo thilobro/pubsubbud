@@ -2,6 +2,7 @@ from pubsubbud import pubsub_handler, callback_handler, websocket_handler
 import asyncio
 from typing import Any
 import logging
+from pubsubbud.config import WebsocketHandlerConfig, PubsubHandlerConfig
 
 
 async def callback(content: dict[str, Any], header: dict[str, Any]) -> None:
@@ -18,15 +19,21 @@ async def callback2(content: dict[str, Any], header: dict[str, Any]) -> None:
 
 async def main() -> None:
     logger = logging.getLogger("test_logger")
-    ps_handler = pubsub_handler.PubsubHandler("123", logger)
+
+    pubsub_handler_config_path = "./configs/pubsub.json"
+    ps_handler_config = PubsubHandlerConfig.from_json(pubsub_handler_config_path)
+    ps_handler = pubsub_handler.PubsubHandler(ps_handler_config, logger)
 
     cb_handler = callback_handler.CallbackHandler(logger)
     cb_handler.register_callback("test_callback", callback)
     cb_handler.register_callback("test_callback", callback2)
 
+    websocket_handler_config_path = "./configs/websocket.json"
+    ws_handler_config = WebsocketHandlerConfig.from_json(websocket_handler_config_path)
     ws_handler = websocket_handler.WebsocketHandler(ps_handler.publish,
                                                     ps_handler.subscribe,
                                                     ps_handler.unsubscribe,
+                                                    ws_handler_config,
                                                     logger)
 
     ps_handler.add_interface("callback", cb_handler)

@@ -6,6 +6,7 @@ import uuid
 import json
 from pubsubbud.pubsub_interface import PubsubInterface
 import logging
+from pubsubbud.config import PubsubHandlerConfig
 
 
 def create_header(channel: str) -> dict[str, Any]:
@@ -17,9 +18,9 @@ def create_header(channel: str) -> dict[str, Any]:
 
 class PubsubHandler:
 
-    def __init__(self, uuid: str, logger: logging.Logger) -> None:
+    def __init__(self, config: PubsubHandlerConfig, logger: logging.Logger) -> None:
         self._logger = logger
-        self._uuid = uuid
+        self._uuid = config.uuid
         self._redis = redis.Redis()
         self._pubsub = self._redis.pubsub()
         self._setup_message_thread()

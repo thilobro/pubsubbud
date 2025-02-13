@@ -7,6 +7,7 @@ from pubsubbud.pubsub_interface import PubsubInterface
 from pubsubbud.custom_types import (ProcessMessageCallback,
                                     SubscriptionCallback,
                                     UnsubscriptionCallback)
+from pubsubbud.config import WebsocketHandlerConfig
 import logging
 
 
@@ -23,8 +24,10 @@ class WebsocketHandler(PubsubInterface):
     def __init__(self, process_message_callback: ProcessMessageCallback,
                  subscription_callback: SubscriptionCallback,
                  unsubscription_callback: UnsubscriptionCallback,
+                 config: WebsocketHandlerConfig,
                  logger: logging.Logger) -> None:
         super().__init__(publish_callback=self._send, logger=logger)
+        self._config = config
         self._run_task: Optional[asyncio.Task] = None
         self._active_connections: dict[str, WebsocketConnection] = {}
         self._process_message_callback = process_message_callback
@@ -32,8 +35,7 @@ class WebsocketHandler(PubsubInterface):
         self._unsubscription_callback = unsubscription_callback
 
     async def _serve(self) -> None:
-        # TODO(this should come from a config file)
-        async with serve(self._handle_websocket, "localhost", 8765) as server:
+        async with serve(self._handle_websocket, self._config.host, self._config.port) as server:
             await server.serve_forever()
 
     def run(self) -> None:
