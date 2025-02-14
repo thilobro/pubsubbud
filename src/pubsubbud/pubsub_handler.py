@@ -45,10 +45,20 @@ class PubsubHandler:
         interface_name: Optional[str] = None,
         interface_id: Optional[str] = None,
     ) -> None:
-        if interface_id and interface_name:
+        if interface_name:
             self._interfaces[interface_name].unsubscribe(channel_name, interface_id)
-        await self._pubsub.unsubscribe(channel_name)
-        await self._pubsub.unsubscribe(f"{self._uuid}/{channel_name}")
+        else:
+            for interface in self._interfaces.values():
+                interface.unsubscribe(channel_name, interface_id)
+        if not self._has_subscribers(channel_name):
+            await self._pubsub.unsubscribe(channel_name)
+            await self._pubsub.unsubscribe(f"{self._uuid}/{channel_name}")
+
+    def _has_subscribers(self, channel_name: str) -> bool:
+        for interface in self._interfaces.values():
+            if interface.has_subscribers(channel_name):
+                return True
+        return False
 
     def _setup_message_thread(self) -> None:
         def target() -> None:
@@ -94,8 +104,8 @@ class PubsubHandler:
         for interface in self._interfaces.values():
             await interface.publish_if_subscribed(channel, content, header)
 
-    def add_interface(self, name: str, interface: PubsubInterface) -> None:
-        self._interfaces[name] = interface
+    def add_interface(self, interface: PubsubInterface) -> None:
+        self._interfaces[interface.name] = interface
 
     def close(self) -> None:
         self._logger.info("Closing pubsub.")

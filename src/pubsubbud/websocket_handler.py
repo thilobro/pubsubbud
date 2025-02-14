@@ -26,13 +26,14 @@ class WebsocketConnection:
 class WebsocketHandler(PubsubInterface):
     def __init__(
         self,
+        name: str,
         process_message_callback: ProcessMessageCallback,
         subscription_callback: SubscriptionCallback,
         unsubscription_callback: UnsubscriptionCallback,
         config: WebsocketHandlerConfig,
         logger: logging.Logger,
     ) -> None:
-        super().__init__(publish_callback=self._send, logger=logger)
+        super().__init__(name=name, publish_callback=self._send, logger=logger)
         self._config = config
         self._run_task: Optional[asyncio.Task] = None
         self._active_connections: dict[str, WebsocketConnection] = {}
@@ -61,11 +62,11 @@ class WebsocketHandler(PubsubInterface):
         subscription_channel = message["subscription_channel"]
         if subscription_type == "subscription":
             await self._subcription_callback(
-                subscription_channel, "websocket", interface_id
+                subscription_channel, self._name, interface_id
             )
         elif subscription_type == "unsubscription":
             await self._unsubscription_callback(
-                subscription_channel, "websocket", interface_id
+                subscription_channel, self._name, interface_id
             )
         else:
             raise ValueError(f"Subscription type not supported: {subscription_type}.")

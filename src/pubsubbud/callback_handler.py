@@ -6,8 +6,10 @@ from pubsubbud.pubsub_interface import PubsubInterface
 
 
 class CallbackHandler(PubsubInterface):
-    def __init__(self, logger: logging.Logger) -> None:
-        super().__init__(publish_callback=self._execute_callbacks, logger=logger)
+    def __init__(self, name: str, logger: logging.Logger) -> None:
+        super().__init__(
+            name=name, publish_callback=self._execute_callbacks, logger=logger
+        )
         self._callbacks: dict[str, list[CBHandlerCallback]] = {}
 
     async def _execute_callbacks(

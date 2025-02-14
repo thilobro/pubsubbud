@@ -25,13 +25,14 @@ async def main() -> None:
     ps_handler_config = PubsubHandlerConfig.from_json(pubsub_handler_config_path)
     ps_handler = pubsub_handler.PubsubHandler(ps_handler_config, logger)
 
-    cb_handler = callback_handler.CallbackHandler(logger)
+    cb_handler = callback_handler.CallbackHandler("callback", logger)
     cb_handler.register_callback("test_callback", callback)
     cb_handler.register_callback("test_callback", callback2)
 
     websocket_handler_config_path = "./configs/websocket.json"
     ws_handler_config = WebsocketHandlerConfig.from_json(websocket_handler_config_path)
     ws_handler = websocket_handler.WebsocketHandler(
+        "websocket",
         ps_handler.publish,
         ps_handler.subscribe,
         ps_handler.unsubscribe,
@@ -39,8 +40,8 @@ async def main() -> None:
         logger,
     )
 
-    ps_handler.add_interface("callback", cb_handler)
-    ps_handler.add_interface("websocket", ws_handler)
+    ps_handler.add_interface(cb_handler)
+    ps_handler.add_interface(ws_handler)
     await ps_handler.subscribe(
         channel_name="test", interface_name="callback", interface_id="test_callback"
     )
