@@ -23,7 +23,7 @@ class CallbackHandler(PubsubInterface):
         pass
 
     async def stop(self) -> None:
-        pass
+        self._logger.info(f"Interface {self._name} stopped.")
 
     @property
     def message_iterator(self) -> Optional[AsyncIterable]:

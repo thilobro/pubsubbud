@@ -35,13 +35,10 @@ class WebsocketHandler(PubsubInterface):
         self._active_connections: dict[str, WebsocketConnection] = {}
 
     async def _serve(self) -> None:
-        try:
-            async with serve(
-                self._handle_websocket, self._config.host, self._config.port
-            ) as server:
-                await server.serve_forever()
-        except asyncio.exceptions.CancelledError:
-            pass
+        async with serve(
+            self._handle_websocket, self._config.host, self._config.port
+        ) as server:
+            await server.serve_forever()
 
     def run(self) -> None:
         self._run_task = asyncio.create_task(self._serve())
@@ -49,7 +46,10 @@ class WebsocketHandler(PubsubInterface):
     async def stop(self) -> None:
         if self._run_task:
             self._run_task.cancel()
-            await self._run_task
+            try:
+                await self._run_task
+            except asyncio.exceptions.CancelledError:
+                self._logger.info(f"Interface {self._name} stopped.")
 
     async def _handle_websocket(self, websocket) -> None:
         try:
