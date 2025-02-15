@@ -1,5 +1,5 @@
 import logging
-from typing import Any, Optional
+from typing import Any, AsyncIterable, Optional
 
 from pubsubbud.custom_types import CBHandlerCallback
 from pubsubbud.pubsub_interface import PubsubInterface
@@ -25,7 +25,8 @@ class CallbackHandler(PubsubInterface):
     async def stop(self) -> None:
         pass
 
-    def _message_iterator(self) -> None:
+    @property
+    def message_iterator(self) -> Optional[AsyncIterable]:
         return None
 
     def register_callback(self, interface_id: str, callback: CBHandlerCallback) -> None:

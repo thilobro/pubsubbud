@@ -95,21 +95,17 @@ class PubsubHandler:
                                 )
                             elif message_type == "pubsub":
                                 await self._handle_pubsub_message(message)
-                            ack_message = {}
                             ack_header = {
                                 "ack_id": message_id,
                                 "status_code": http.HTTPStatus.OK,
                             }
                         except Exception:
-                            ack_message = {}
                             ack_header = {
                                 "ack_id": message_id,
                                 "status_code": http.HTTPStatus.INTERNAL_SERVER_ERROR,
                             }
                         finally:
-                            await interface.publish(
-                                interface_id, ack_message, ack_header
-                            )
+                            await interface.publish(interface_id, {}, ack_header)
 
                 # TODO(close this tasks)
                 asyncio.create_task(_get_interface_messages())
