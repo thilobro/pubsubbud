@@ -44,10 +44,10 @@ async def main() -> None:
     )
     await ps_handler.publish("test", {"test": 1})
     ps_handler.run()
-    while True:
+    for i in range(4):
         await asyncio.sleep(5)
         await ps_handler.publish("test", {"test": 1})
-    # ps_handler.close()
+    await ps_handler.close()
 
 
 asyncio.run(main())

@@ -25,6 +25,7 @@ class PubsubHandler:
         self._redis = redis.Redis()
         self._pubsub = self._redis.pubsub()
         self._interfaces: dict[str, PubsubInterface] = {}
+        self._interface_tasks: dict[str, asyncio.Task] = {}
 
     async def subscribe(
         self,
@@ -107,8 +108,9 @@ class PubsubHandler:
                         finally:
                             await interface.publish(interface_id, {}, ack_header)
 
-                # TODO(close this tasks)
-                asyncio.create_task(_get_interface_messages())
+                self._interface_tasks[interface.name] = asyncio.create_task(
+                    _get_interface_messages()
+                )
 
     def run(self) -> None:
         self._run_message_task()
@@ -145,6 +147,11 @@ class PubsubHandler:
 
     async def close(self) -> None:
         self._logger.info("Closing pubsub.")
+        self._message_task.cancel()
+        for task in self._interface_tasks.values():
+            task.cancel()
+        for interface in self._interfaces.values():
+            await interface.stop()
         await self._pubsub.close()
 
     async def publish(
