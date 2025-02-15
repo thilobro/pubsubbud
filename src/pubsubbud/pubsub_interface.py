@@ -1,7 +1,7 @@
 import asyncio
 import logging
 from abc import ABC, abstractmethod
-from typing import AsyncIterable, Optional
+from typing import Any, AsyncIterable, Optional
 
 from pubsubbud.custom_types import IFPublishCallback
 
@@ -40,6 +40,11 @@ class PubsubInterface(ABC):
 
     def has_subscribers(self, channel_name: str) -> bool:
         return channel_name in self._subscribed_channels.keys()
+
+    async def publish(
+        self, interface_id: str, content: dict[str, Any], header: dict[str, Any]
+    ) -> None:
+        await self._publish_callback(interface_id, content, header)
 
     async def publish_if_subscribed(self, channel_name, content, header) -> None:
         if self.has_subscribers(channel_name):

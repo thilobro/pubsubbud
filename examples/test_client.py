@@ -3,13 +3,15 @@ import json
 
 from websockets.asyncio.client import connect
 
-test_msg = {"type": "pubsub", "channel": "test", "data": "test2"}
+test_msg = {"_id": "0", "type": "pubsub", "channel": "test", "data": "test2"}
 test_sub_msg = {
+    "_id": "1",
     "type": "subscription",
     "subscription_type": "subscription",
     "subscription_channel": "test",
 }
 test_unsub_msg = {
+    "_id": "2",
     "type": "subscription",
     "subscription_type": "unsubscription",
     "subscription_channel": "test",

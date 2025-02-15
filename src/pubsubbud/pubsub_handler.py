@@ -1,4 +1,5 @@
 import asyncio
+import http
 import json
 import logging
 import uuid
@@ -84,13 +85,31 @@ class PubsubHandler:
 
                 async def _get_interface_messages():
                     async for message, interface_id in interface.message_iterator:  # type: ignore
-                        message_type = message["type"]
-                        if message_type == "subscription":
-                            await self._handle_subscription_message(
-                                message, interface.name, interface_id
+                        message_id = None
+                        try:
+                            message_type = message["type"]
+                            message_id = message["_id"]
+                            if message_type == "subscription":
+                                await self._handle_subscription_message(
+                                    message, interface.name, interface_id
+                                )
+                            elif message_type == "pubsub":
+                                await self._handle_pubsub_message(message)
+                            ack_message = {}
+                            ack_header = {
+                                "ack_id": message_id,
+                                "status_code": http.HTTPStatus.OK,
+                            }
+                        except Exception:
+                            ack_message = {}
+                            ack_header = {
+                                "ack_id": message_id,
+                                "status_code": http.HTTPStatus.INTERNAL_SERVER_ERROR,
+                            }
+                        finally:
+                            await interface.publish(
+                                interface_id, ack_message, ack_header
                             )
-                        elif message_type == "pubsub":
-                            await self._handle_pubsub_message(message)
 
                 # TODO(close this tasks)
                 asyncio.create_task(_get_interface_messages())

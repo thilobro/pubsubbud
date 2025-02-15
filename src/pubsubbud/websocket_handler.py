@@ -48,11 +48,6 @@ class WebsocketHandler(PubsubInterface):
             self._run_task.cancel()
             await self._run_task
 
-    async def _message_iterator(self) -> AsyncIterable:
-        while True:
-            message = await self._message_queue.get()
-            yield message["message"], message["websocket_id"]
-
     async def _handle_websocket(self, websocket) -> None:
         try:
             self._connect(websocket)
@@ -60,7 +55,7 @@ class WebsocketHandler(PubsubInterface):
                 message = json.loads(message)
                 self._logger.info(f"Message received: {message}")
                 await self._message_queue.put(
-                    {"message": message, "websocket_id": websocket.id}
+                    {"message": message, "interface_id": websocket.id}
                 )
         except (
             websockets.exceptions.ConnectionClosedError,
