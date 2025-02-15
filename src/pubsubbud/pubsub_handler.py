@@ -1,7 +1,6 @@
 import asyncio
 import json
 import logging
-import threading
 import uuid
 from typing import Any, Optional
 
@@ -24,8 +23,6 @@ class PubsubHandler:
         self._uuid = config.uuid
         self._redis = redis.Redis()
         self._pubsub = self._redis.pubsub()
-        self._setup_message_thread()
-        self._canceled_event = asyncio.Event()
         self._interfaces: dict[str, PubsubInterface] = {}
 
     async def subscribe(
@@ -60,18 +57,43 @@ class PubsubHandler:
                 return True
         return False
 
-    def _setup_message_thread(self) -> None:
-        def target() -> None:
-            asyncio.run(self._run())
-
-        self._message_thread = threading.Thread(target=target)
-
     def _run_message_task(self) -> None:
         self._message_task = asyncio.create_task(self._read_messages())
+
+    async def _handle_subscription_message(
+        self, message: dict[str, Any], interface_name: str, interface_id: str
+    ) -> None:
+        subscription_type = message["subscription_type"]
+        subscription_channel = message["subscription_channel"]
+        if subscription_type == "subscription":
+            await self.subscribe(subscription_channel, interface_name, interface_id)
+        elif subscription_type == "unsubscription":
+            await self.unsubscribe(subscription_channel, interface_name, interface_id)
+        else:
+            raise ValueError(f"Subscription type not supported: {subscription_type}.")
+
+    async def _handle_pubsub_message(self, message: dict[str, Any]) -> None:
+        channel = message["channel"]
+        data = message["data"]
+        await self.publish(channel, data, True)
 
     def _run_interface_tasks(self) -> None:
         for interface in self._interfaces.values():
             interface.run()
+            if interface.message_iterator:
+
+                async def _get_interface_messages():
+                    async for message, interface_id in interface.message_iterator:  # type: ignore
+                        message_type = message["type"]
+                        if message_type == "subscription":
+                            await self._handle_subscription_message(
+                                message, interface.name, interface_id
+                            )
+                        elif message_type == "pubsub":
+                            await self._handle_pubsub_message(message)
+
+                # TODO(close this tasks)
+                asyncio.create_task(_get_interface_messages())
 
     def run(self) -> None:
         self._run_message_task()
@@ -87,8 +109,7 @@ class PubsubHandler:
                 message_task.cancel()
 
     async def _read_messages(self) -> None:
-        while not self._canceled_event.is_set():
-            message = await self._pubsub.get_message()
+        async for message in self._pubsub.listen():
             if message and not message["type"] == "subscribe":
                 self._logger.debug(f"Message from redis: {message}")
                 channel = message["channel"].decode()
@@ -107,9 +128,9 @@ class PubsubHandler:
     def add_interface(self, interface: PubsubInterface) -> None:
         self._interfaces[interface.name] = interface
 
-    def close(self) -> None:
+    async def close(self) -> None:
         self._logger.info("Closing pubsub.")
-        self._canceled_event.set()
+        await self._pubsub.close()
 
     async def publish(
         self, channel, data: dict[str, Any], internal: bool = False
@@ -121,7 +142,3 @@ class PubsubHandler:
             channel = f"{self._uuid}/{channel}"
         self._logger.debug(f"Message to redis: {message}, {channel}")
         await self._redis.publish(channel, json.dumps(message))
-
-    @property
-    def is_running(self) -> bool:
-        return not self._canceled_event.is_set()

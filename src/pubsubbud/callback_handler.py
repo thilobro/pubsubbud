@@ -25,6 +25,9 @@ class CallbackHandler(PubsubInterface):
     async def stop(self) -> None:
         pass
 
+    def _message_iterator(self) -> None:
+        return None
+
     def register_callback(self, interface_id: str, callback: CBHandlerCallback) -> None:
         try:
             self._callbacks[interface_id].append(callback)

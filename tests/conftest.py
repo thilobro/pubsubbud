@@ -1,5 +1,5 @@
 import logging
-from unittest.mock import AsyncMock
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
@@ -25,12 +25,21 @@ def test_callback_interface(test_logger):
     return cb_handler
 
 
+class AsyncContextManager(MagicMock):
+    async def __aenter__(self):
+        pass
+
+    async def __aexit__(self, exc_type, exc, traceback):
+        pass
+
+
 @pytest.fixture
 def test_pubsub_handler(test_logger):
     ps_handler = pubsub_handler.PubsubHandler(
         config=PubsubHandlerConfig(uuid="123"), logger=test_logger
     )
     ps_handler._pubsub = AsyncMock()
+    ps_handler._pubsub.listen = AsyncContextManager()
     return ps_handler
 
 

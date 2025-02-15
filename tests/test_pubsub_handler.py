@@ -28,4 +28,4 @@ async def test_subscribe_unsubscribe(test_pubsub_handler, test_callback_interfac
 @pytest.mark.asyncio
 async def test_run_close(test_pubsub_handler):
     test_pubsub_handler.run()
-    test_pubsub_handler.close()
+    await test_pubsub_handler.close()

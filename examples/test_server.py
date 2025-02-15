@@ -33,9 +33,6 @@ async def main() -> None:
     ws_handler_config = WebsocketHandlerConfig.from_json(websocket_handler_config_path)
     ws_handler = websocket_handler.WebsocketHandler(
         "websocket",
-        ps_handler.publish,
-        ps_handler.subscribe,
-        ps_handler.unsubscribe,
         ws_handler_config,
         logger,
     )

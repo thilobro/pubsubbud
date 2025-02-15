@@ -1,6 +1,7 @@
+import asyncio
 import logging
 from abc import ABC, abstractmethod
-from typing import Optional
+from typing import AsyncIterable, Optional
 
 from pubsubbud.custom_types import IFPublishCallback
 
@@ -11,6 +12,7 @@ class PubsubInterface(ABC):
     ) -> None:
         self._name = name
         self._logger = logger
+        self._message_queue: asyncio.Queue[dict[str, str]] = asyncio.Queue(maxsize=100)
         self._publish_callback = publish_callback
         self._subscribed_channels: dict[str, list[str]] = {}
 
@@ -48,6 +50,11 @@ class PubsubInterface(ABC):
             except Exception:
                 pass
 
+    async def _message_iterator(self) -> AsyncIterable:
+        while True:
+            message = await self._message_queue.get()
+            yield message["message"], message["interface_id"]
+
     @abstractmethod
     async def stop(self) -> None:
         pass
@@ -59,3 +66,7 @@ class PubsubInterface(ABC):
     @property
     def name(self) -> str:
         return self._name
+
+    @property
+    def message_iterator(self) -> Optional[AsyncIterable]:
+        return self._message_iterator()
