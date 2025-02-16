@@ -3,26 +3,8 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
-from pubsubbud import callback_handler, pubsub_handler
+from pubsubbud import pubsub_handler
 from pubsubbud.config import PubsubHandlerConfig
-
-
-@pytest.fixture
-def test_callback_interface(test_logger):
-    async def callback(content, header):
-        print("Executed callback")
-        print(content)
-        print(header)
-
-    async def callback2(content, header):
-        print("Executed callback2")
-        print(content)
-        print(header)
-
-    cb_handler = callback_handler.CallbackHandler("callback", test_logger)
-    cb_handler.register_callback("test_callback", callback)
-    cb_handler.register_callback("test_callback", callback2)
-    return cb_handler
 
 
 class AsyncContextManager(MagicMock):

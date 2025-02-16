@@ -8,6 +8,7 @@ from typing import Any, Optional
 import redis.asyncio as redis
 
 from pubsubbud.config import PubsubHandlerConfig
+from pubsubbud.custom_types import CBHandlerCallback
 from pubsubbud.pubsub_interface import PubsubInterface
 
 
@@ -21,11 +22,50 @@ def create_header(channel: str) -> dict[str, Any]:
 class PubsubHandler:
     def __init__(self, config: PubsubHandlerConfig, logger: logging.Logger) -> None:
         self._logger = logger
+        self._channels: list[str] = []
+        self._callbacks: dict[str, list[CBHandlerCallback]] = {}
         self._uuid = config.uuid
         self._redis = redis.Redis()
         self._pubsub = self._redis.pubsub()
         self._interfaces: dict[str, PubsubInterface] = {}
         self._interface_tasks: dict[str, asyncio.Task] = {}
+
+    async def _add_channel(self, channel_name: str) -> None:
+        if channel_name not in self._channels:
+            await self._pubsub.subscribe(channel_name)
+            await self._pubsub.subscribe(f"{self._uuid}/{channel_name}")
+            self._channels.append(channel_name)
+
+    async def _remove_channel(self, channel_name: str) -> None:
+        if channel_name in self._channels:
+            await self._pubsub.unsubscribe(channel_name)
+            await self._pubsub.unsubscribe(f"{self._uuid}/{channel_name}")
+            self._channels.remove(channel_name)
+
+    async def register_callback(
+        self, channel_name: str, callback: CBHandlerCallback
+    ) -> None:
+        try:
+            self._callbacks[channel_name].append(callback)
+        except KeyError:
+            self._callbacks[channel_name] = [callback]
+        await self._add_channel(channel_name)
+
+    async def unregister_callback(
+        self, channel_name: str, callback: Optional[CBHandlerCallback]
+    ) -> None:
+        # TODO: remove channels
+        try:
+            if callback:
+                self._callbacks[channel_name].remove(callback)
+                if not self._callbacks[channel_name]:
+                    del self._callbacks[channel_name]
+            else:
+                del self._callbacks[channel_name]
+        except KeyError:
+            self._logger.warning(
+                f"Unable to unregister callbacks to channel name {channel_name}."
+            )
 
     async def subscribe(
         self,
@@ -35,8 +75,7 @@ class PubsubHandler:
     ) -> None:
         if interface_id and interface_name:
             self._interfaces[interface_name].subscribe(channel_name, interface_id)
-        await self._pubsub.subscribe(channel_name)
-        await self._pubsub.subscribe(f"{self._uuid}/{channel_name}")
+        await self._add_channel(channel_name)
 
     async def unsubscribe(
         self,
@@ -50,8 +89,7 @@ class PubsubHandler:
             for interface in self._interfaces.values():
                 interface.unsubscribe(channel_name, interface_id)
         if not self._has_subscribers(channel_name):
-            await self._pubsub.unsubscribe(channel_name)
-            await self._pubsub.unsubscribe(f"{self._uuid}/{channel_name}")
+            await self._remove_channel(channel_name)
 
     def _has_subscribers(self, channel_name: str) -> bool:
         for interface in self._interfaces.values():
@@ -125,17 +163,25 @@ class PubsubHandler:
             if not message_task.cancelled():
                 message_task.cancel()
 
+    async def _execute_callbacks(
+        self, channel_name: str, content: dict[str, Any], header: dict[str, Any]
+    ):
+        callbacks = self._callbacks[channel_name]
+        for callback in callbacks:
+            await callback(content, header)
+
     async def _read_messages(self) -> None:
         async for message in self._pubsub.listen():
             if message and not message["type"] == "subscribe":
                 self._logger.debug(f"Message from redis: {message}")
-                channel = message["channel"].decode()
-                if "/" in channel:
-                    channel = channel.split("/")[1]
+                channel_name = message["channel"].decode()
+                if "/" in channel_name:
+                    channel_name = channel_name.split("/")[1]
                 data = json.loads(message["data"].decode())
                 content = data["content"]
                 header = data["header"]
-                await self._forward_to_interfaces(channel, content, header)
+                await self._forward_to_interfaces(channel_name, content, header)
+                await self._execute_callbacks(channel_name, content, header)
         raise asyncio.CancelledError()
 
     async def _forward_to_interfaces(self, channel, content, header) -> None:

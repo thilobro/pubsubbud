@@ -23,7 +23,7 @@ async def hello():
         await websocket.send(json.dumps(test_msg))
         await websocket.send(json.dumps(test_sub_msg))
         i = 0
-        for i in range(3):
+        for i in range(10):
             message = await websocket.recv()
             print(message)
             i += 1

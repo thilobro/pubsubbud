@@ -1,7 +1,7 @@
 import asyncio
 import json
 import logging
-from typing import Any, AsyncIterable, Optional
+from typing import Any, Optional
 
 import websockets
 from websockets.asyncio.server import serve
