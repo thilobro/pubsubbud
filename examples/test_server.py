@@ -2,8 +2,12 @@ import asyncio
 import logging
 from typing import Any
 
-from pubsubbud import pubsub_handler, websocket_handler
-from pubsubbud.config import PubsubHandlerConfig, WebsocketHandlerConfig
+from pubsubbud import mqtt_handler, pubsub_handler, websocket_handler
+from pubsubbud.config import (
+    MqttHandlerConfig,
+    PubsubHandlerConfig,
+    WebsocketHandlerConfig,
+)
 
 
 async def callback(content: dict[str, Any], header: dict[str, Any]) -> None:
@@ -20,6 +24,7 @@ async def callback2(content: dict[str, Any], header: dict[str, Any]) -> None:
 
 async def main() -> None:
     logger = logging.getLogger("test_logger")
+    logging.basicConfig(level=logging.INFO)
 
     pubsub_handler_config_path = "./configs/pubsub.json"
     ps_handler_config = PubsubHandlerConfig.from_json(pubsub_handler_config_path)
@@ -35,8 +40,12 @@ async def main() -> None:
         ws_handler_config,
         logger,
     )
+    mqtt_handler_config_path = "./configs/mqtt.json"
+    mqtt_handler_config = MqttHandlerConfig.from_json(mqtt_handler_config_path)
+    m_handler = mqtt_handler.MqttHandler("mqtt", mqtt_handler_config, logger)
 
     ps_handler.add_interface(ws_handler)
+    ps_handler.add_interface(m_handler)
     await ps_handler.publish("test", {"test": 1})
     ps_handler.run()
     for i in range(10):
