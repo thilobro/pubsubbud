@@ -122,7 +122,7 @@ class PubsubHandler:
             interface.run()
             if interface.message_iterator:
 
-                async def _get_interface_messages():
+                async def _get_interface_messages(interface=interface):
                     async for message, interface_id in interface.message_iterator:  # type: ignore
                         message_id = None
                         try:
