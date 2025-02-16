@@ -18,3 +18,10 @@ class PubsubHandlerConfig(JsonConfig):
 class WebsocketHandlerConfig(JsonConfig):
     host: str
     port: int
+
+
+class MqttHandlerConfig(JsonConfig):
+    host: str
+    port: int
+    to_pubsub_topic: str
+    from_pubsub_topic: str

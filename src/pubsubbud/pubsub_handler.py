@@ -1,4 +1,5 @@
 import asyncio
+import functools
 import http
 import json
 import logging
@@ -67,7 +68,7 @@ class PubsubHandler:
                 f"Unable to unregister callbacks to channel name {channel_name}."
             )
 
-    async def subscribe(
+    async def _subscribe(
         self,
         channel_name: str,
         interface_name: Optional[str] = None,
@@ -77,7 +78,7 @@ class PubsubHandler:
             self._interfaces[interface_name].subscribe(channel_name, interface_id)
         await self._add_channel(channel_name)
 
-    async def unsubscribe(
+    async def _unsubscribe(
         self,
         channel_name: str,
         interface_name: Optional[str] = None,
@@ -106,9 +107,9 @@ class PubsubHandler:
         subscription_type = message["subscription_type"]
         subscription_channel = message["subscription_channel"]
         if subscription_type == "subscription":
-            await self.subscribe(subscription_channel, interface_name, interface_id)
+            await self._subscribe(subscription_channel, interface_name, interface_id)
         elif subscription_type == "unsubscription":
-            await self.unsubscribe(subscription_channel, interface_name, interface_id)
+            await self._unsubscribe(subscription_channel, interface_name, interface_id)
         else:
             raise ValueError(f"Subscription type not supported: {subscription_type}.")
 
@@ -120,35 +121,34 @@ class PubsubHandler:
     def _run_interface_tasks(self) -> None:
         for interface in self._interfaces.values():
             interface.run()
-            if interface.message_iterator:
+            self._interface_tasks[interface.name] = asyncio.create_task(
+                self._get_interface_messages(interface)
+            )
 
-                async def _get_interface_messages(interface=interface):
-                    async for message, interface_id in interface.message_iterator:  # type: ignore
-                        message_id = None
-                        try:
-                            message_type = message["type"]
-                            message_id = message["_id"]
-                            if message_type == "subscription":
-                                await self._handle_subscription_message(
-                                    message, interface.name, interface_id
-                                )
-                            elif message_type == "pubsub":
-                                await self._handle_pubsub_message(message)
-                            ack_header = {
-                                "ack_id": message_id,
-                                "status_code": http.HTTPStatus.OK,
-                            }
-                        except Exception:
-                            ack_header = {
-                                "ack_id": message_id,
-                                "status_code": http.HTTPStatus.INTERNAL_SERVER_ERROR,
-                            }
-                        finally:
-                            await interface.publish(interface_id, {}, ack_header)
-
-                self._interface_tasks[interface.name] = asyncio.create_task(
-                    _get_interface_messages()
-                )
+    async def _get_interface_messages(self, interface):
+        async for message, interface_id in interface.message_iterator:  # type: ignore
+            try:
+                message_id = None
+                message_type = message["type"]
+                message_id = message["_id"]
+                self._logger.info(f"Message from interface {interface.name}: {message}")
+                if message_type == "subscription":
+                    await self._handle_subscription_message(
+                        message, interface.name, interface_id
+                    )
+                elif message_type == "pubsub":
+                    await self._handle_pubsub_message(message)
+                ack_header = {
+                    "ack_id": message_id,
+                    "status_code": http.HTTPStatus.OK,
+                }
+            except Exception:
+                ack_header = {
+                    "ack_id": message_id,
+                    "status_code": http.HTTPStatus.INTERNAL_SERVER_ERROR,
+                }
+            finally:
+                await interface.publish(interface_id, {}, ack_header)
 
     def run(self) -> None:
         self._run_message_task()
