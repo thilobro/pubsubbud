@@ -11,7 +11,7 @@ class JsonConfig(pydantic.BaseModel):
         return cls.model_validate(json_config)
 
 
-class PubsubHandlerConfig(JsonConfig):
+class PubsubManagerConfig(JsonConfig):
     uuid: str
 
 

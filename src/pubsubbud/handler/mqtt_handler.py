@@ -6,10 +6,12 @@ from typing import Any, Optional
 from aiomqtt import Client
 
 from pubsubbud.config import MqttHandlerConfig
-from pubsubbud.pubsub_interface import PubsubInterface
+from pubsubbud.handler.handler_interface import HandlerInterface
+from pubsubbud.models import BrokerMessage
 
 
-class MqttHandler(PubsubInterface):
+# TODO: move to paho mqtt!
+class MqttHandler(HandlerInterface):
     def __init__(
         self,
         name: str,
@@ -29,7 +31,9 @@ class MqttHandler(PubsubInterface):
                 if isinstance(message.payload, bytes):
                     await self._message_queue.put(
                         {
-                            "message": json.loads(message.payload.decode()),
+                            "message": BrokerMessage(
+                                **json.loads(message.payload.decode())
+                            ),
                             "interface_id": self._subscribe_topic,
                         }
                     )
