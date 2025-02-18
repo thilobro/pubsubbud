@@ -3,8 +3,8 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
-from pubsubbud import pubsub_handler
-from pubsubbud.config import PubsubHandlerConfig
+from pubsubbud.config import PubsubManagerConfig
+from pubsubbud.pubsub_manager import PubsubManager
 
 
 class AsyncContextManager(MagicMock):
@@ -16,13 +16,14 @@ class AsyncContextManager(MagicMock):
 
 
 @pytest.fixture
-def test_pubsub_handler(test_logger):
-    ps_handler = pubsub_handler.PubsubHandler(
-        config=PubsubHandlerConfig(uuid="123"), logger=test_logger
+def test_pubsub_manager(test_logger):
+    test_broker = None
+    ps_manager = PubsubManager(
+        config=PubsubManagerConfig(uuid="123"), broker=test_broker, logger=test_logger
     )
-    ps_handler._pubsub = AsyncMock()
-    ps_handler._pubsub.listen = AsyncContextManager()
-    return ps_handler
+    ps_manager._broker = AsyncMock()
+    ps_manager._broker.read_messages = AsyncContextManager()
+    return ps_manager
 
 
 @pytest.fixture

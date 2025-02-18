@@ -12,6 +12,7 @@ dependencies = [
     "websockets (>=14.2,<15.0)",
     "pydantic (>=2.10.6,<3.0.0)",
     "isort (>=6.0.0,<7.0.0)",
+    "paho-mqtt (>=2.1.0,<3.0.0)",
     "aiomqtt (>=2.3.0,<3.0.0)",
 ]
 

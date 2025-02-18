@@ -7,7 +7,7 @@ import websockets
 from websockets.asyncio.server import serve
 
 from pubsubbud.config import WebsocketHandlerConfig
-from pubsubbud.pubsub_interface import PubsubInterface
+from pubsubbud.handler.handler_interface import HandlerInterface
 
 
 class WebsocketConnection:
@@ -22,7 +22,7 @@ class WebsocketConnection:
         await self._websocket.send(json.dumps(message))
 
 
-class WebsocketHandler(PubsubInterface):
+class WebsocketHandler(HandlerInterface):
     def __init__(
         self,
         name: str,

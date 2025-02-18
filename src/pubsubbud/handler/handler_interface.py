@@ -6,13 +6,13 @@ from typing import Any, AsyncIterable, Optional
 from pubsubbud.custom_types import IFPublishCallback
 
 
-class PubsubInterface(ABC):
+class HandlerInterface(ABC):
     def __init__(
         self, name: str, publish_callback: IFPublishCallback, logger: logging.Logger
     ) -> None:
         self._name = name
         self._logger = logger
-        self._message_queue: asyncio.Queue[dict[str, str]] = asyncio.Queue(maxsize=100)
+        self._message_queue: asyncio.Queue[dict[str, Any]] = asyncio.Queue(maxsize=100)
         self._publish_callback = publish_callback
         self._subscribed_channels: dict[str, list[str]] = {}
 
