@@ -4,6 +4,7 @@ from abc import ABC, abstractmethod
 from typing import Any, AsyncIterable, Optional
 
 from pubsubbud.custom_types import IFPublishCallback
+from pubsubbud.models import BrokerMessage
 
 
 class HandlerInterface(ABC):
@@ -12,53 +13,62 @@ class HandlerInterface(ABC):
     ) -> None:
         self._name = name
         self._logger = logger
-        self._message_queue: asyncio.Queue[dict[str, Any]] = asyncio.Queue(maxsize=100)
+        self._message_queue: asyncio.Queue[BrokerMessage] = asyncio.Queue(maxsize=100)
         self._publish_callback = publish_callback
         self._subscribed_channels: dict[str, list[str]] = {}
 
-    def subscribe(self, channel_name: str, interface_id: str) -> None:
+    def subscribe(self, channel_name: str, handler_id: str) -> None:
         try:
-            if interface_id in self._subscribed_channels[channel_name]:
+            if handler_id in self._subscribed_channels[channel_name]:
                 self._logger.info(
-                    f"Interface {interface_id} is already subscribed to channel {channel_name}."
+                    f"Handler {handler_id} is already subscribed to channel {channel_name}."
                 )
                 return None
-            self._subscribed_channels[channel_name].append(interface_id)
+            self._subscribed_channels[channel_name].append(handler_id)
         except KeyError:
-            self._subscribed_channels[channel_name] = [interface_id]
+            self._subscribed_channels[channel_name] = [handler_id]
         self._logger.info(
-            f"Subscribed to channel {channel_name} for interface {interface_id}"
+            f"Subscribed to channel {channel_name} for interface {handler_id}"
         )
 
-    def unsubscribe(self, channel_name: str, interface_id: Optional[str]) -> None:
-        if interface_id:
-            self._subscribed_channels[channel_name].remove(interface_id)
+    def unsubscribe(
+        self, channel_name: Optional[str] = None, handler_id: Optional[str] = None
+    ) -> None:
+        if channel_name and not handler_id:
+            del self._subscribed_channels[channel_name]
+        elif channel_name and handler_id:
+            self._subscribed_channels[channel_name].remove(handler_id)
             if not self._subscribed_channels[channel_name]:
                 del self._subscribed_channels[channel_name]
-        else:
-            del self._subscribed_channels[channel_name]
+        else:  # only handler id
+            for channel_name, handler_ids in self._subscribed_channels.items():
+                if handler_id in handler_ids:
+                    self._subscribed_channels[channel_name].remove(handler_id)
 
     def has_subscribers(self, channel_name: str) -> bool:
         return channel_name in self._subscribed_channels.keys()
 
     async def publish(
-        self, interface_id: str, content: dict[str, Any], header: dict[str, Any]
+        self, handler_id: str, content: dict[str, Any], header: dict[str, Any]
     ) -> None:
-        await self._publish_callback(interface_id, content, header)
+        await self._publish_callback(handler_id, content, header)
 
     async def publish_if_subscribed(self, channel_name, content, header) -> None:
         if self.has_subscribers(channel_name):
-            try:
-                interface_ids = self._subscribed_channels[channel_name]
-                for interface_id in interface_ids:
+            interface_ids = self._subscribed_channels[channel_name]
+            for interface_id in interface_ids:
+                try:
                     await self._publish_callback(interface_id, content, header)
-            except Exception:
-                pass
+                except Exception:
+                    # TODO: here we should catch a custom exception
+                    # thrown when the target does not respond,
+                    # then we disconnect said target
+                    pass
 
     async def _message_iterator(self) -> AsyncIterable:
         while True:
             message = await self._message_queue.get()
-            yield message["message"], message["interface_id"]
+            yield message
 
     @abstractmethod
     async def stop(self) -> None:

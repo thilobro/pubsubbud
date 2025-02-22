@@ -27,17 +27,24 @@ class PubsubManager:
         self._handlers: dict[str, HandlerInterface] = {}
         self._handler_tasks: dict[str, asyncio.Task] = {}
 
+    async def _cleanup_channels(self) -> None:
+        for channel_name in self._channels:
+            if not self._has_subscribers(channel_name):
+                await self._remove_channel(channel_name)
+
     async def _add_channel(self, channel_name: str) -> None:
         if channel_name not in self._channels:
             await self._broker.subscribe(channel_name)
             await self._broker.subscribe(f"{self._uuid}/{channel_name}")
             self._channels.append(channel_name)
+        await self._cleanup_channels()
 
     async def _remove_channel(self, channel_name: str) -> None:
         if channel_name in self._channels:
             await self._broker.unsubscribe(channel_name)
             await self._broker.unsubscribe(f"{self._uuid}/{channel_name}")
             self._channels.remove(channel_name)
+        await self._cleanup_channels()
 
     async def register_callback(
         self, channel_name: str, callback: CBHandlerCallback
@@ -89,6 +96,8 @@ class PubsubManager:
             await self._remove_channel(channel_name)
 
     def _has_subscribers(self, channel_name: str) -> bool:
+        if channel_name in self._callbacks.keys():
+            return True
         for handler in self._handlers.values():
             if handler.has_subscribers(channel_name):
                 return True
@@ -122,9 +131,10 @@ class PubsubManager:
             )
 
     async def _get_handler_messages(self, handler):
-        async for message, handler_id in handler.message_iterator:  # type: ignore
+        async for message in handler.message_iterator:  # type: ignore
             try:
                 channel_name = message.header.channel
+                handler_id = message.header.origin_id
                 message_id = message.header.message_id
                 self._logger.info(f"Message from handler {handler.name}: {message}")
                 if channel_name == "subscription":

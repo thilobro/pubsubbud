@@ -8,6 +8,7 @@ from websockets.asyncio.server import serve
 
 from pubsubbud.config import WebsocketHandlerConfig
 from pubsubbud.handler.handler_interface import HandlerInterface
+from pubsubbud.models import BrokerMessage
 
 
 class WebsocketConnection:
@@ -56,10 +57,9 @@ class WebsocketHandler(HandlerInterface):
             self._connect(websocket)
             async for message in websocket:
                 message = json.loads(message)
+                message["header"]["origin_id"] = str(websocket.id)
                 self._logger.info(f"Message received: {message}")
-                await self._message_queue.put(
-                    {"message": message, "interface_id": websocket.id}
-                )
+                await self._message_queue.put(BrokerMessage(**message))
         except (
             websockets.exceptions.ConnectionClosedError,
             websockets.exceptions.ConnectionClosedOK,
@@ -69,15 +69,16 @@ class WebsocketHandler(HandlerInterface):
             self._disconnect(websocket)
 
     async def _send(
-        self, interface_id: str, content: dict[str, Any], header: dict[str, Any]
+        self, handler_id: str, content: dict[str, Any], header: dict[str, Any]
     ) -> None:
         message = {"content": content, "header": header}
-        await self._active_connections[interface_id].send(message)
+        await self._active_connections[handler_id].send(message)
 
     def _connect(self, websocket) -> None:
-        self._active_connections[websocket.id] = WebsocketConnection(
+        self._active_connections[str(websocket.id)] = WebsocketConnection(
             websocket, self._logger
         )
 
     def _disconnect(self, websocket) -> None:
-        del self._active_connections[websocket.id]
+        del self._active_connections[str(websocket.id)]
+        self.unsubscribe(handler_id=str(websocket.id))
