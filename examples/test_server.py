@@ -3,6 +3,7 @@ import logging
 from typing import Any
 
 from pubsubbud.broker.mqtt_broker import MqttBroker
+from pubsubbud.broker.redis_broker import RedisBroker
 from pubsubbud.config import (
     MqttHandlerConfig,
     PubsubManagerConfig,
@@ -29,7 +30,7 @@ async def main() -> None:
     logging.basicConfig(level=logging.INFO)
 
     pubsub_handler_config_path = "./configs/pubsub.json"
-    broker = MqttBroker()
+    broker = RedisBroker()
     ps_manager_config = PubsubManagerConfig.from_json(pubsub_handler_config_path)
     ps_manager = PubsubManager(ps_manager_config, broker, logger)
 

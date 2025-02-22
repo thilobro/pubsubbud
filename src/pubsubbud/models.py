@@ -6,6 +6,7 @@ import pydantic
 class BrokerMessageHeader(pydantic.BaseModel):
     message_id: str
     channel: str
+    origin_id: str
 
 
 class BrokerMessage(pydantic.BaseModel):

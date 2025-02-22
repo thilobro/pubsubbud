@@ -1,5 +1,5 @@
 import json
-from typing import Any, AsyncGenerator
+from typing import AsyncGenerator
 
 import redis.asyncio as redis
 
@@ -26,6 +26,6 @@ class RedisBroker(BrokerInterface):
 
     async def read_messages(self) -> AsyncGenerator[BrokerMessage, None]:
         async for message in self._broker.listen():
-            if message["type"] != "subscribe":
+            if "subscribe" not in message["type"]:
                 payload = json.loads(json.loads(message["data"].decode()))
                 yield BrokerMessage(**payload)

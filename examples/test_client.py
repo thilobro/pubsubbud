@@ -32,6 +32,9 @@ test_unsub_msg = {
 
 async def hello():
     async with connect("ws://localhost:8765") as websocket:
+        test_msg["header"]["origin_id"] = str(websocket.id)
+        test_sub_msg["header"]["origin_id"] = str(websocket.id)
+        test_unsub_msg["header"]["origin_id"] = str(websocket.id)
         await websocket.send(json.dumps(test_msg))
         await websocket.send(json.dumps(test_sub_msg))
         i = 0

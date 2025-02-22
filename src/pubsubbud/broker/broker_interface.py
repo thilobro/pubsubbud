@@ -23,5 +23,5 @@ class BrokerInterface(ABC):
 
     @abstractmethod
     async def read_messages(self) -> AsyncGenerator[BrokerMessage, None]:
-        header = BrokerMessageHeader(message_id="1", channel="dummy")
+        header = BrokerMessageHeader(message_id="1", channel="dummy", origin_id="dummy")
         yield BrokerMessage(header=header, content={"dummy": 1})
