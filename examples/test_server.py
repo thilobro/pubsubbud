@@ -12,6 +12,8 @@ from pubsubbud.config import (
 from pubsubbud.handler import mqtt_handler, websocket_handler
 from pubsubbud.pubsub_manager import PubsubManager
 
+BROKER_TYPE = "redis"
+
 
 async def callback(content: dict[str, Any], header: dict[str, Any]) -> None:
     print("Executed callback")
@@ -30,7 +32,12 @@ async def main() -> None:
     logging.basicConfig(level=logging.INFO)
 
     pubsub_handler_config_path = "./configs/pubsub.json"
-    broker = RedisBroker()
+    if BROKER_TYPE == "redis":
+        broker = RedisBroker()
+    elif BROKER_TYPE == "mqtt":
+        broker = MqttBroker()
+    else:
+        raise ValueError("Invalid broker specified")
     ps_manager_config = PubsubManagerConfig.from_json(pubsub_handler_config_path)
     ps_manager = PubsubManager(ps_manager_config, broker, logger)
 

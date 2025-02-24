@@ -6,7 +6,7 @@ from typing import Any, Optional
 
 from pubsubbud.broker.broker_interface import BrokerInterface
 from pubsubbud.config import PubsubManagerConfig
-from pubsubbud.custom_types import CBHandlerCallback
+from pubsubbud.custom_types import PubsubCallback
 from pubsubbud.handler.handler_interface import HandlerInterface
 from pubsubbud.helpers import create_header
 from pubsubbud.models import BrokerMessage
@@ -21,7 +21,7 @@ class PubsubManager:
     ) -> None:
         self._logger = logger
         self._channels: list[str] = []
-        self._callbacks: dict[str, list[CBHandlerCallback]] = {}
+        self._callbacks: dict[str, list[PubsubCallback]] = {}
         self._uuid = config.uuid
         self._broker = broker
         self._handlers: dict[str, HandlerInterface] = {}
@@ -47,7 +47,7 @@ class PubsubManager:
         await self._cleanup_channels()
 
     async def register_callback(
-        self, channel_name: str, callback: CBHandlerCallback
+        self, channel_name: str, callback: PubsubCallback
     ) -> None:
         try:
             self._callbacks[channel_name].append(callback)
@@ -56,7 +56,7 @@ class PubsubManager:
         await self._add_channel(channel_name)
 
     async def unregister_callback(
-        self, channel_name: str, callback: Optional[CBHandlerCallback]
+        self, channel_name: str, callback: Optional[PubsubCallback] = None
     ) -> None:
         # TODO: remove channels
         try:
