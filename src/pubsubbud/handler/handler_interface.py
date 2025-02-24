@@ -3,13 +3,16 @@ import logging
 from abc import ABC, abstractmethod
 from typing import Any, AsyncIterable, Optional
 
-from pubsubbud.custom_types import IFPublishCallback
+from pubsubbud.custom_types import HandlerPublishCallback
 from pubsubbud.models import BrokerMessage
 
 
 class HandlerInterface(ABC):
     def __init__(
-        self, name: str, publish_callback: IFPublishCallback, logger: logging.Logger
+        self,
+        name: str,
+        publish_callback: HandlerPublishCallback,
+        logger: logging.Logger,
     ) -> None:
         self._name = name
         self._logger = logger
