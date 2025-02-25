@@ -5,8 +5,10 @@ from typing import Any
 from pubsubbud.broker.mqtt_broker import MqttBroker
 from pubsubbud.broker.redis_broker import RedisBroker
 from pubsubbud.config import (
+    MqttBrokerConfig,
     MqttHandlerConfig,
     PubsubManagerConfig,
+    RedisBrokerConfig,
     WebsocketHandlerConfig,
 )
 from pubsubbud.handler import mqtt_handler, websocket_handler
@@ -33,8 +35,12 @@ async def main() -> None:
 
     pubsub_handler_config_path = "./configs/pubsub.json"
     if BROKER_TYPE == "redis":
-        broker = RedisBroker()
+        redis_broker_config_path = "./configs/redis_broker.json"
+        config = RedisBrokerConfig.from_json(redis_broker_config_path)
+        broker = RedisBroker(config)
     elif BROKER_TYPE == "mqtt":
+        mqtt_broker_config_path = "./configs/mqtt_broker.json"
+        config = MqttBrokerConfig.from_json(mqtt_broker_config_path)
         broker = MqttBroker()
     else:
         raise ValueError("Invalid broker specified")
@@ -44,14 +50,14 @@ async def main() -> None:
     await ps_manager.register_callback("test", callback)
     await ps_manager.register_callback("test", callback2)
 
-    websocket_handler_config_path = "./configs/websocket.json"
+    websocket_handler_config_path = "./configs/websocket_handler.json"
     ws_handler_config = WebsocketHandlerConfig.from_json(websocket_handler_config_path)
     ws_handler = websocket_handler.WebsocketHandler(
         "websocket",
         ws_handler_config,
         logger,
     )
-    mqtt_handler_config_path = "./configs/mqtt.json"
+    mqtt_handler_config_path = "./configs/mqtt_handler.json"
     mqtt_handler_config = MqttHandlerConfig.from_json(mqtt_handler_config_path)
     m_handler = mqtt_handler.MqttHandler("mqtt", mqtt_handler_config, logger)
 

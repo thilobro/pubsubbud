@@ -25,3 +25,13 @@ class MqttHandlerConfig(JsonConfig):
     port: int
     to_pubsub_topic: str
     from_pubsub_topic: str
+
+
+class RedisBrokerConfig(JsonConfig):
+    host: str
+    port: int
+
+
+class MqttBrokerConfig(JsonConfig):
+    host: str
+    port: int

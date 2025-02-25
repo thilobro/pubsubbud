@@ -5,16 +5,16 @@ from typing import AsyncGenerator
 import paho.mqtt.client as mqtt
 
 from pubsubbud.broker.broker_interface import BrokerInterface
-from pubsubbud.helpers import create_header
+from pubsubbud.config import MqttBrokerConfig
 from pubsubbud.models import BrokerMessage
 
 
 class MqttBroker(BrokerInterface):
-    def __init__(self) -> None:
+    def __init__(self, config: MqttBrokerConfig) -> None:
         self._message_queue: asyncio.Queue[mqtt.MQTTMessage] = asyncio.Queue()
         self._client = mqtt.Client(mqtt.CallbackAPIVersion.VERSION2)
         self._client.on_message = self._on_message
-        self._client.connect("localhost", port=1883)
+        self._client.connect(config.host, port=config.port)
         self._client.loop_start()
 
     def _on_message(self, client, userdata, message) -> None:

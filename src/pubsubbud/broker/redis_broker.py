@@ -4,12 +4,13 @@ from typing import AsyncGenerator
 import redis.asyncio as redis
 
 from pubsubbud.broker.broker_interface import BrokerInterface
+from pubsubbud.config import RedisBrokerConfig
 from pubsubbud.models import BrokerMessage
 
 
 class RedisBroker(BrokerInterface):
-    def __init__(self) -> None:
-        self._redis = redis.Redis()
+    def __init__(self, config: RedisBrokerConfig) -> None:
+        self._redis = redis.Redis(host=config.host, port=config.port)
         self._broker = self._redis.pubsub()
 
     async def subscribe(self, channel_name: str) -> None:
