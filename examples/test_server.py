@@ -2,9 +2,11 @@ import asyncio
 import logging
 from typing import Any
 
+from pubsubbud.broker.kafka_broker import KafkaBroker
 from pubsubbud.broker.mqtt_broker import MqttBroker
 from pubsubbud.broker.redis_broker import RedisBroker
 from pubsubbud.config import (
+    KafkaBrokerConfig,
     MqttBrokerConfig,
     MqttHandlerConfig,
     PubsubManagerConfig,
@@ -14,7 +16,7 @@ from pubsubbud.config import (
 from pubsubbud.handler import mqtt_handler, websocket_handler
 from pubsubbud.pubsub_manager import PubsubManager
 
-BROKER_TYPE = "redis"
+BROKER_TYPE = "kafka"
 
 
 async def callback(content: dict[str, Any], header: dict[str, Any]) -> None:
@@ -41,7 +43,11 @@ async def main() -> None:
     elif BROKER_TYPE == "mqtt":
         mqtt_broker_config_path = "./configs/mqtt_broker.json"
         config = MqttBrokerConfig.from_json(mqtt_broker_config_path)
-        broker = MqttBroker()
+        broker = MqttBroker(config)
+    elif BROKER_TYPE == "kafka":
+        kafka_broker_config_path = "./configs/kafka_broker.json"
+        config = KafkaBrokerConfig.from_json(kafka_broker_config_path)
+        broker = KafkaBroker(config)
     else:
         raise ValueError("Invalid broker specified")
     ps_manager_config = PubsubManagerConfig.from_json(pubsub_handler_config_path)

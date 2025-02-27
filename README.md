@@ -11,6 +11,7 @@ Only one message broker can be used at a time.
 Available brokers:
 * Redis
 * MQTT
+* Kafka
 New brokers can be added by implementing the `BrokerInterface` abstract base class.
 
 ## Handlers
