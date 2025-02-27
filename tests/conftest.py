@@ -3,7 +3,8 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
-from pubsubbud.config import PubsubManagerConfig
+from pubsubbud.config import PubsubManagerConfig, WebsocketHandlerConfig
+from pubsubbud.handler.websocket_handler import WebsocketHandler
 from pubsubbud.pubsub_manager import PubsubManager
 
 
@@ -13,6 +14,12 @@ class AsyncContextManager(MagicMock):
 
     async def __aexit__(self, exc_type, exc, traceback):
         pass
+
+
+@pytest.fixture
+def test_websocket_handler(test_logger):
+    config = WebsocketHandlerConfig(host="localhost", port=8675)
+    return WebsocketHandler("websocket", config, test_logger)
 
 
 @pytest.fixture
