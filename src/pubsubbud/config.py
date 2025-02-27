@@ -35,3 +35,8 @@ class RedisBrokerConfig(JsonConfig):
 class MqttBrokerConfig(JsonConfig):
     host: str
     port: int
+
+
+class KafkaBrokerConfig(JsonConfig):
+    host: str
+    port: int
