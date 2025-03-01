@@ -7,13 +7,14 @@ from pubsubbud.broker.mqtt_broker import MqttBroker
 from pubsubbud.broker.redis_broker import RedisBroker
 from pubsubbud.config import (
     KafkaBrokerConfig,
+    KafkaHandlerConfig,
     MqttBrokerConfig,
     MqttHandlerConfig,
     PubsubManagerConfig,
     RedisBrokerConfig,
     WebsocketHandlerConfig,
 )
-from pubsubbud.handler import mqtt_handler, websocket_handler
+from pubsubbud.handler import kafka_handler, mqtt_handler, websocket_handler
 from pubsubbud.pubsub_manager import PubsubManager
 
 BROKER_TYPE = "kafka"
@@ -67,8 +68,12 @@ async def main() -> None:
     mqtt_handler_config = MqttHandlerConfig.from_json(mqtt_handler_config_path)
     m_handler = mqtt_handler.MqttHandler("mqtt", mqtt_handler_config, logger)
 
+    kafka_handler_config = KafkaHandlerConfig.from_json("./configs/kafka_handler.json")
+    k_handler = kafka_handler.KafkaHandler("kafka", kafka_handler_config, logger)
+
     ps_manager.add_handler(ws_handler)
     ps_manager.add_handler(m_handler)
+    ps_manager.add_handler(k_handler)
     await ps_manager.publish("test", {"test": 1})
     ps_manager.run()
     for i in range(10):
