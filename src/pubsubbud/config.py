@@ -40,3 +40,10 @@ class MqttBrokerConfig(JsonConfig):
 class KafkaBrokerConfig(JsonConfig):
     host: str
     port: int
+
+
+class KafkaHandlerConfig(JsonConfig):
+    host: str
+    port: int
+    to_pubsub_topic: str
+    from_pubsub_topic: str
