@@ -19,6 +19,7 @@ class PubsubManager:
         broker: BrokerInterface,
         logger: logging.Logger,
     ) -> None:
+        self._message_task: Optional[asyncio.Task] = None
         self._logger = logger
         self._channels: list[str] = []
         self._callbacks: dict[str, list[PubsubCallback]] = {}
@@ -30,13 +31,16 @@ class PubsubManager:
     async def _cleanup_channels(self) -> None:
         for channel_name in self._channels:
             if not self._has_subscribers(channel_name):
+                self._logger.info(f"Removing channel {channel_name}.")
                 await self._remove_channel(channel_name)
 
     async def _add_channel(self, channel_name: str) -> None:
+        self._logger.info(f"Adding channel {channel_name}")
         if channel_name not in self._channels:
             await self._broker.subscribe(channel_name)
             await self._broker.subscribe(f"{self._uuid}/{channel_name}")
             self._channels.append(channel_name)
+            await self._restart_message_task()
         await self._cleanup_channels()
 
     async def _remove_channel(self, channel_name: str) -> None:
@@ -106,6 +110,16 @@ class PubsubManager:
     def _run_message_task(self) -> None:
         self._message_task = asyncio.create_task(self._read_messages())
 
+    async def _restart_message_task(self) -> None:
+        if self._message_task:
+            self._message_task.cancel()
+            try:
+                await self._message_task
+            except asyncio.exceptions.CancelledError:
+                pass
+            finally:
+                self._message_task = asyncio.create_task(self._read_messages())
+
     async def _handle_subscription_message(
         self, message: BrokerMessage, handler_name: str, handler_id: str
     ) -> None:
@@ -162,9 +176,12 @@ class PubsubManager:
     async def _execute_callbacks(
         self, channel_name: str, content: dict[str, Any], header: dict[str, Any]
     ):
-        callbacks = self._callbacks[channel_name]
-        for callback in callbacks:
-            await callback(content, header)
+        try:
+            callbacks = self._callbacks[channel_name]
+            for callback in callbacks:
+                await callback(content, header)
+        except KeyError:
+            pass
 
     async def _read_messages(self) -> None:
         async for message in self._broker.read_messages():
@@ -187,7 +204,8 @@ class PubsubManager:
 
     async def close(self) -> None:
         self._logger.info("Closing pubsub.")
-        self._message_task.cancel()
+        if self._message_task:
+            self._message_task.cancel()
         for task in self._handler_tasks.values():
             task.cancel()
         for handler in self._handlers.values():
@@ -202,5 +220,5 @@ class PubsubManager:
         message["header"] = create_header(channel_name)
         if internal:
             channel_name = f"{self._uuid}/{channel_name}"
-        self._logger.debug(f"Message to redis: {message}, {channel_name}")
+        self._logger.info(f"Message to broker: {message}, {channel_name}")
         await self._broker.publish(channel_name, json.dumps(message))
