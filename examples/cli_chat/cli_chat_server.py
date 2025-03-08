@@ -1,5 +1,6 @@
 import asyncio
 import logging
+import os
 
 from pubsubbud.broker.redis_broker import RedisBroker
 from pubsubbud.config import (
@@ -10,13 +11,18 @@ from pubsubbud.config import (
 from pubsubbud.handler import websocket_handler
 from pubsubbud.pubsub_manager import PubsubManager
 
+BROKER = os.environ.get("BROKER", "redis")
+
 
 class CLIChatServer:
     def __init__(self, logger):
         self._logger = logger
-        redis_broker_config_path = "./configs/redis_broker.json"
-        config = RedisBrokerConfig.from_json(redis_broker_config_path)
-        broker = RedisBroker(config)
+        if BROKER == "redis":
+            redis_broker_config_path = "./configs/redis_broker.json"
+            config = RedisBrokerConfig.from_json(redis_broker_config_path)
+            broker = RedisBroker(config)
+        else:
+            raise ValueError(f"Unknown broker: {BROKER}")
         pubsub_manager_config_path = "./configs/pubsub.json"
         ps_manager_config = PubsubManagerConfig.from_json(pubsub_manager_config_path)
         self._ps_manager = PubsubManager(ps_manager_config, broker, logger)
@@ -33,12 +39,7 @@ class CLIChatServer:
 
         self._ps_manager.add_handler(ws_handler)
 
-    async def _rooms_callback(content, header):
-        print("TEST")
-        # room_name = content["room_name"]
-
     async def run(self):
-        await self._ps_manager.register_callback("rooms", self._rooms_callback)
         self._ps_manager.run()
 
 
