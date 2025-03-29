@@ -24,9 +24,6 @@ class KafkaHandler(HandlerInterface):
 
     async def _add_message_to_queue(self, message) -> None:
         payload = json.loads(message.value.decode())
-        import pdb
-
-        pdb.set_trace()
         await self._message_queue.put(BrokerMessage(**payload))
 
     def run(self) -> None:
@@ -54,5 +51,5 @@ class KafkaHandler(HandlerInterface):
             await self._producer.start()
             self._is_producer_started = True
         message = {"content": content, "header": header}
-        topic = self._publish_topic + "/" + handler_id
-        self._producer.send(topic, value=json.dumps(message).encode("utf"))
+        topic = self._publish_topic + "." + handler_id
+        await self._producer.send(topic, value=json.dumps(message).encode("utf"))
