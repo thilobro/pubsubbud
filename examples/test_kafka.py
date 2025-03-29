@@ -7,6 +7,7 @@ test_sub_msg = {
     "header": {
         "message_id": "1",
         "channel": "subscription",
+        "origin_id": "test_origin",
     },
     "content": {
         "subscription_type": "subscription",
