@@ -62,7 +62,6 @@ class PubsubManager:
     async def unregister_callback(
         self, channel_name: str, callback: Optional[PubsubCallback] = None
     ) -> None:
-        # TODO: remove channels
         try:
             if callback:
                 self._callbacks[channel_name].remove(callback)
@@ -70,6 +69,8 @@ class PubsubManager:
                     del self._callbacks[channel_name]
             else:
                 del self._callbacks[channel_name]
+            await self._cleanup_channels()
+
         except KeyError:
             self._logger.warning(
                 f"Unable to unregister callbacks to channel name {channel_name}."
