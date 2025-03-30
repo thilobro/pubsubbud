@@ -1,23 +1,95 @@
 # PubsubBud
 
-PubsubBud is a modular publish subscribe framework.
-It provides an easy way to communicate consistently between multiple frontend clients and backend replicas.
-It handles communication between different handlers by using a single message broker.
-Work in progress.
+PubsubBud is a modular publish-subscribe framework that simplifies communication between frontend clients and backend replicas. It provides a unified messaging interface by abstracting different message brokers and communication protocols into a single, consistent API.
 
-## Brokers
+## Features
 
-Only one message broker can be used at a time.
-Available brokers:
-* Redis
-* MQTT
-* Kafka
-New brokers can be added by implementing the `BrokerInterface` abstract base class.
+- Single message broker architecture for consistent message delivery
+- Multiple protocol handlers for client communication
+- Modular design for easy extension
+- Async/await support
+- Type-safe message handling
+- Automatic channel management
 
-## Handlers
+## Installation
 
-Multiple handlers can be used at the same time.
-Available handlers:
-* websockets
-* MQTT
-New handlers can be added by implementing the `HandlerInterface` abstract base class.
+```bash
+poetry install
+```
+
+## Message Brokers
+
+PubsubBud uses a single message broker for all communication. Currently supported brokers:
+
+- **Redis**: Fast, in-memory message broker
+- **MQTT**: Lightweight messaging for IoT devices
+- **Kafka**: Distributed streaming platform
+
+Implement the `BrokerInterface` to add support for additional message brokers:
+
+```python
+from pubsubbud.broker.broker_interface import BrokerInterface
+
+class CustomBroker(BrokerInterface):
+    async def subscribe(self, channel_name: str) -> None:
+        ...
+```
+
+## Protocol Handlers
+
+Multiple handlers can be used simultaneously to support different client protocols:
+
+- **WebSocket**: Real-time web client communication
+- **MQTT**: IoT device communication
+- **Kafka**: Distributed streaming platform
+
+Add new handlers by implementing the `HandlerInterface`:
+
+```python
+from pubsubbud.handler.handler_interface import HandlerInterface
+
+class CustomHandler(HandlerInterface):
+    async def publish_if_subscribed(self, channel: str, content: dict, header: dict) -> None:
+        ...
+```
+
+## Configuration
+
+PubsubBud uses Pydantic models for configuration. Example configurations can be found in the `configs/` directory:
+
+- `redis_broker.json`: Redis broker settings
+- `mqtt_broker.json`: MQTT broker settings
+- `kafka_broker.json`: Kafka broker settings
+- `pubsub.json`: PubsubManager settings
+
+## Examples
+
+Check the `examples/` directory for:
+- Basic usage examples
+- Different broker configurations
+- Handler implementations
+- Complete application examples
+
+## Development
+
+```bash
+# Install dependencies
+poetry install
+
+# Run tests
+poetry run pytest
+
+# Run example
+poetry run python examples/cli_chat/cli_chat_server.py
+```
+
+## Contributing
+
+1. Fork the repository
+2. Create a feature branch
+3. Add tests for new features
+4. Submit a pull request
+
+## Project Status
+
+This project is under active development. Features and APIs may change.
