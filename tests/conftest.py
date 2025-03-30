@@ -108,7 +108,7 @@ async def mqtt_broker(mqtt_broker_config):
 
 
 @pytest_asyncio.fixture
-async def redis_broker(redis_broker_config):
+async def redis_broker(redis_broker_config) -> RedisBroker:
     with patch("redis.asyncio.Redis") as mock_redis:
         redis_instance = AsyncMock()
         pubsub = AsyncMock()
