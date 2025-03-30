@@ -30,7 +30,7 @@ class MqttBroker(BrokerInterface):
         self._client.unsubscribe(channel_name)
 
     async def publish(self, channel_name: str, message: str) -> None:
-        self._client.publish(channel_name, json.dumps(message))
+        self._client.publish(channel_name, message)
 
     async def close(self) -> None:
         self._client.loop_stop()
@@ -38,5 +38,5 @@ class MqttBroker(BrokerInterface):
     async def read_messages(self) -> AsyncGenerator[BrokerMessage, None]:
         while True:
             message = await self._message_queue.get()
-            payload = json.loads(json.loads(message.payload.decode()))
+            payload = json.loads(message.payload.decode())
             yield BrokerMessage(**payload)
