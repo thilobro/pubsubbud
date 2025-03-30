@@ -20,7 +20,7 @@ class RedisBroker(BrokerInterface):
         await self._broker.unsubscribe(channel_name)
 
     async def publish(self, channel_name: str, message: str) -> None:
-        await self._redis.publish(channel_name, json.dumps(message))
+        await self._redis.publish(channel_name, message)
 
     async def close(self) -> None:
         pass
@@ -28,5 +28,5 @@ class RedisBroker(BrokerInterface):
     async def read_messages(self) -> AsyncGenerator[BrokerMessage, None]:
         async for message in self._broker.listen():
             if "subscribe" not in message["type"]:
-                payload = json.loads(json.loads(message["data"].decode()))
+                payload = json.loads(message["data"].decode())
                 yield BrokerMessage(**payload)

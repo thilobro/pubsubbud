@@ -34,8 +34,7 @@ class KafkaBroker(BrokerInterface):
         if not self._is_producer_started:
             await self._producer.start()
             self._is_producer_started = True
-        byte_message = json.dumps(message).encode("utf")
-        await self._producer.send(channel_name, byte_message)
+        await self._producer.send(channel_name, message.encode("utf"))
 
     async def close(self) -> None:
         await self._producer.stop()
@@ -44,5 +43,5 @@ class KafkaBroker(BrokerInterface):
     async def read_messages(self) -> AsyncGenerator[BrokerMessage, None]:
         await self._consumer.start()
         async for message in self._consumer:
-            payload = json.loads(json.loads(message.value.decode()))
+            payload = json.loads(message.value.decode())
             yield BrokerMessage(**payload)
