@@ -7,6 +7,10 @@ from pubsubbud.custom_types import HandlerPublishCallback
 from pubsubbud.models import BrokerMessage
 
 
+class HandlerConnectionError(Exception):
+    pass
+
+
 class HandlerInterface(ABC):
     def __init__(
         self,
@@ -54,19 +58,25 @@ class HandlerInterface(ABC):
     async def publish(
         self, handler_id: str, content: dict[str, Any], header: dict[str, Any]
     ) -> None:
-        await self._publish_callback(handler_id, content, header)
+        try:
+            await self._publish_callback(handler_id, content, header)
+        except HandlerConnectionError:
+            if await self._handle_connection_error(handler_id):
+                # Retry if handler indicates recovery was successful
+                await self._publish_callback(handler_id, content, header)
+            else:
+                self._logger.warning(
+                    f"Handler {self._name} with id {handler_id} disconnected."
+                )
+                self.unsubscribe(handler_id=handler_id)
 
-    async def publish_if_subscribed(self, channel_name, content, header) -> None:
+    async def publish_if_subscribed(
+        self, channel_name: str, content: dict[str, Any], header: dict[str, Any]
+    ) -> None:
         if self.has_subscribers(channel_name):
             interface_ids = self._subscribed_channels[channel_name]
             for interface_id in interface_ids:
-                try:
-                    await self._publish_callback(interface_id, content, header)
-                except Exception:
-                    # TODO: here we should catch a custom exception
-                    # thrown when the target does not respond,
-                    # then we disconnect said target
-                    pass
+                await self.publish(interface_id, content, header)
 
     async def _message_iterator(self) -> AsyncIterable:
         while True:
@@ -80,6 +90,13 @@ class HandlerInterface(ABC):
     @abstractmethod
     def run(self) -> None:
         pass
+
+    async def _handle_connection_error(self, handler_id: str) -> bool:
+        self._logger.warning(
+            f"Connection error in handler {self._name} with id {handler_id}. "
+            "No recovery attempted."
+        )
+        return False
 
     @property
     def name(self) -> str:

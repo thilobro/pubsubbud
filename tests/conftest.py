@@ -10,11 +10,13 @@ from pubsubbud.broker.mqtt_broker import MqttBroker
 from pubsubbud.broker.redis_broker import RedisBroker
 from pubsubbud.config import (
     KafkaBrokerConfig,
+    KafkaHandlerConfig,
     MqttBrokerConfig,
     PubsubManagerConfig,
     RedisBrokerConfig,
     WebsocketHandlerConfig,
 )
+from pubsubbud.handler.kafka_handler import KafkaHandler
 from pubsubbud.handler.websocket_handler import WebsocketHandler
 from pubsubbud.pubsub_manager import PubsubManager
 
@@ -123,3 +125,30 @@ async def redis_broker(redis_broker_config):
         broker._redis = redis_instance
         broker._broker = pubsub
         return broker
+
+
+@pytest_asyncio.fixture
+async def kafka_handler():
+    logger = MagicMock()
+    config = KafkaHandlerConfig(
+        host="localhost",
+        port=9092,
+        to_pubsub_topic="test_in",
+        from_pubsub_topic="test_out",
+        connection_retries=2,
+    )
+
+    # Mock sleep to make tests faster
+    with (
+        patch("asyncio.sleep", new_callable=AsyncMock),
+        patch("aiokafka.AIOKafkaProducer"),
+        patch("aiokafka.AIOKafkaConsumer"),
+    ):
+        handler = KafkaHandler("test", config, logger)
+        handler._producer = AsyncMock()
+        handler._consumer = AsyncMock()
+        handler._run_task = None
+        yield handler
+        await handler._producer.stop()
+        await handler._consumer.stop()
+        await handler.stop()

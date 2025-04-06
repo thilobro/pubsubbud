@@ -4,9 +4,10 @@ import logging
 from typing import Any
 
 from aiokafka import AIOKafkaConsumer, AIOKafkaProducer
+from aiokafka.errors import KafkaConnectionError
 
 from pubsubbud.config import KafkaHandlerConfig
-from pubsubbud.handler.handler_interface import HandlerInterface
+from pubsubbud.handler.handler_interface import HandlerConnectionError, HandlerInterface
 from pubsubbud.models import BrokerMessage
 
 
@@ -18,6 +19,7 @@ class KafkaHandler(HandlerInterface):
         server = f"{host}:{port}"
         self._subscribe_topic = config.to_pubsub_topic.replace("/", ".")
         self._publish_topic = config.from_pubsub_topic.replace("/", ".")
+        self._connection_retries = config.connection_retries
         self._consumer = AIOKafkaConsumer(bootstrap_servers=[server])
         self._producer = AIOKafkaProducer(bootstrap_servers=[server])
         self._is_producer_started = False
@@ -47,9 +49,30 @@ class KafkaHandler(HandlerInterface):
     async def _send(
         self, handler_id: str, content: dict[str, Any], header: dict[str, Any]
     ) -> None:
-        if not self._is_producer_started:
-            await self._producer.start()
-            self._is_producer_started = True
-        message = {"content": content, "header": header}
-        topic = self._publish_topic + "." + handler_id
-        await self._producer.send(topic, value=json.dumps(message).encode("utf"))
+        try:
+            if not self._is_producer_started:
+                await self._producer.start()
+                self._is_producer_started = True
+            message = {"content": content, "header": header}
+            topic = self._publish_topic + "." + handler_id
+            await self._producer.send(topic, value=json.dumps(message).encode("utf"))
+        except KafkaConnectionError:
+            raise HandlerConnectionError(
+                f"Kafka connection lost for handler {handler_id}"
+            )
+
+    async def _handle_connection_error(self, handler_id: str) -> bool:
+        """Try to restart the Kafka producer"""
+        retries = self._connection_retries
+        while retries > 0:
+            try:
+                await self._producer.start()
+                self._is_producer_started = True
+                return True
+            except KafkaConnectionError:
+                retries -= 1
+                await asyncio.sleep(1)  # Wait before retry
+                self._logger.warning(
+                    f"Retrying Kafka connection, {retries} attempts left"
+                )
+        return False

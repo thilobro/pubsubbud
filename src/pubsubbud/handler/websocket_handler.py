@@ -7,7 +7,7 @@ import websockets
 from websockets.asyncio.server import serve
 
 from pubsubbud.config import WebsocketHandlerConfig
-from pubsubbud.handler.handler_interface import HandlerInterface
+from pubsubbud.handler.handler_interface import HandlerConnectionError, HandlerInterface
 from pubsubbud.models import BrokerMessage
 
 
@@ -71,8 +71,13 @@ class WebsocketHandler(HandlerInterface):
     async def _send(
         self, handler_id: str, content: dict[str, Any], header: dict[str, Any]
     ) -> None:
+        try:
+            connection = self._active_connections[handler_id]
+        except KeyError:
+            raise HandlerConnectionError(f"WebSocket {handler_id} not found")
+
         message = {"content": content, "header": header}
-        await self._active_connections[handler_id].send(message)
+        await connection.send(message)
 
     def _connect(self, websocket) -> None:
         self._active_connections[str(websocket.id)] = WebsocketConnection(
@@ -82,3 +87,7 @@ class WebsocketHandler(HandlerInterface):
     def _disconnect(self, websocket) -> None:
         del self._active_connections[str(websocket.id)]
         self.unsubscribe(handler_id=str(websocket.id))
+
+    async def _handle_connection_error(self, handler_id: str) -> bool:
+        """WebSocket connections can't be recovered once lost"""
+        return False
