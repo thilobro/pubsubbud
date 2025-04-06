@@ -30,10 +30,12 @@ class MqttHandler(HandlerInterface):
         self._client.loop_start()
         self._run_task: Optional[asyncio.Task] = None
 
-    def _on_message(self, client, userdata, message) -> None:
+    def _on_message(
+        self, client: mqtt.Client, userdata: Any, message: mqtt.MQTTMessage
+    ) -> None:
         asyncio.run(self._add_message_to_queue(message))
 
-    async def _add_message_to_queue(self, message) -> None:
+    async def _add_message_to_queue(self, message: mqtt.MQTTMessage) -> None:
         if isinstance(message.payload, bytes):
             await self._message_queue.put(
                 BrokerMessage(**json.loads(message.payload.decode()))

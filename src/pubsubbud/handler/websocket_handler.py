@@ -19,7 +19,7 @@ class WebsocketConnection:
         self._websocket = websocket
         self._id = self._websocket.id
 
-    async def send(self, message) -> None:
+    async def send(self, message: dict[str, Any]) -> None:
         await self._websocket.send(json.dumps(message))
 
 
@@ -52,14 +52,18 @@ class WebsocketHandler(HandlerInterface):
             except asyncio.exceptions.CancelledError:
                 self._logger.info(f"Interface {self._name} stopped.")
 
-    async def _handle_websocket(self, websocket) -> None:
+    async def _handle_websocket(self, websocket: websockets.ServerConnection) -> None:
         try:
             self._connect(websocket)
             async for message in websocket:
-                message = json.loads(message)
-                message["header"]["origin_id"] = str(websocket.id)
-                self._logger.info(f"Message received: {message}")
-                await self._message_queue.put(BrokerMessage(**message))
+                # Ensure message is properly decoded if it's bytes
+                message_str = (
+                    message.decode() if isinstance(message, bytes) else message
+                )
+                message_dict = json.loads(message_str)
+                message_dict["header"]["origin_id"] = str(websocket.id)
+                self._logger.info(f"Message received: {message_dict}")
+                await self._message_queue.put(BrokerMessage(**message_dict))
         except (
             websockets.exceptions.ConnectionClosedError,
             websockets.exceptions.ConnectionClosedOK,
@@ -79,15 +83,15 @@ class WebsocketHandler(HandlerInterface):
         message = {"content": content, "header": header}
         await connection.send(message)
 
-    def _connect(self, websocket) -> None:
+    def _connect(self, websocket: websockets.ServerConnection) -> None:
         self._active_connections[str(websocket.id)] = WebsocketConnection(
             websocket, self._logger
         )
 
-    def _disconnect(self, websocket) -> None:
+    def _disconnect(self, websocket: websockets.ServerConnection) -> None:
         del self._active_connections[str(websocket.id)]
         self.unsubscribe(handler_id=str(websocket.id))
 
     async def _handle_connection_error(self, handler_id: str) -> bool:
-        """WebSocket connections can't be recovered once lost"""
+        self._logger.warning(f"WebSocket connection {handler_id} lost.")
         return False

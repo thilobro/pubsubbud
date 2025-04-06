@@ -3,7 +3,7 @@ import json
 import logging
 from typing import Any
 
-from aiokafka import AIOKafkaConsumer, AIOKafkaProducer
+from aiokafka import AIOKafkaConsumer, AIOKafkaProducer, ConsumerRecord
 from aiokafka.errors import KafkaConnectionError
 
 from pubsubbud.config import KafkaHandlerConfig
@@ -24,7 +24,7 @@ class KafkaHandler(HandlerInterface):
         self._producer = AIOKafkaProducer(bootstrap_servers=[server])
         self._is_producer_started = False
 
-    async def _add_message_to_queue(self, message) -> None:
+    async def _add_message_to_queue(self, message: ConsumerRecord) -> None:
         payload = json.loads(message.value.decode())
         await self._message_queue.put(BrokerMessage(**payload))
 
@@ -62,7 +62,6 @@ class KafkaHandler(HandlerInterface):
             )
 
     async def _handle_connection_error(self, handler_id: str) -> bool:
-        """Try to restart the Kafka producer"""
         retries = self._connection_retries
         while retries > 0:
             try:
@@ -73,6 +72,6 @@ class KafkaHandler(HandlerInterface):
                 retries -= 1
                 await asyncio.sleep(1)  # Wait before retry
                 self._logger.warning(
-                    f"Retrying Kafka connection, {retries} attempts left"
+                    f"Retrying Kafka connection {handler_id}, {retries} attempts left"
                 )
         return False
