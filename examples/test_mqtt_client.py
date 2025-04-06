@@ -1,3 +1,20 @@
+"""
+Example demonstrating MQTT client integration with pubsubbud.
+
+This script shows how to:
+1. Create a subscription message for the pubsub system
+2. Connect to an MQTT broker
+3. Subscribe to a unique topic using timestamp as UUID
+4. Publish messages and receive responses
+
+Requirements:
+- Running MQTT broker on localhost:1883
+- aiomqtt package installed
+
+Usage:
+    python test_mqtt_client.py
+"""
+
 import asyncio
 import json
 import time
