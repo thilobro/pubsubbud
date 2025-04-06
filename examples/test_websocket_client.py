@@ -1,3 +1,23 @@
+"""
+Example demonstrating WebSocket client interaction with pubsubbud.
+
+This script shows how to:
+1. Connect to a WebSocket server
+2. Send different types of messages:
+   - Regular message on 'test' channel
+   - Subscription request
+   - Unsubscription request
+3. Receive and print responses
+4. Handle WebSocket connection lifecycle
+
+Requirements:
+- Running pubsubbud WebSocket server on localhost:8765
+- websockets package installed
+
+Usage:
+    python test_websocket_client.py
+"""
+
 import asyncio
 import json
 

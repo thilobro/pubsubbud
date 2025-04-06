@@ -1,3 +1,33 @@
+"""
+Example demonstrating a complete pubsubbud server setup with multiple handlers and brokers.
+
+This script shows how to:
+1. Set up a pubsub manager with different broker types (Redis, MQTT, or Kafka)
+2. Register multiple callbacks for the same channel
+3. Configure and add different handlers:
+   - WebSocket handler
+   - MQTT handler
+   - Kafka handler
+4. Publish messages and maintain the server
+
+Features:
+- Configurable broker selection (Redis, MQTT, Kafka)
+- Multiple callback registration
+- Integration of different protocol handlers
+- Periodic message publishing
+
+Requirements:
+- Configuration files in ./configs/ directory
+- Required broker running (Redis, MQTT, or Kafka)
+- All handler dependencies installed
+
+Usage:
+    python test_server.py
+
+Configuration:
+    Modify BROKER_TYPE to choose between "redis", "mqtt", or "kafka"
+"""
+
 import asyncio
 import logging
 from typing import Any

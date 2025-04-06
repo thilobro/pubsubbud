@@ -1,3 +1,19 @@
+"""
+Example demonstrating basic Kafka producer and consumer setup with pubsubbud.
+
+This script shows how to:
+1. Create a subscription message for the pubsub system
+2. Set up an async Kafka producer and consumer
+3. Send a message to a Kafka topic
+
+Requirements:
+- Running Kafka broker on localhost:9092
+- aiokafka package installed
+
+Usage:
+    python test_kafka.py
+"""
+
 import asyncio
 import json
 
