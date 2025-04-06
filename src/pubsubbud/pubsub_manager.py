@@ -145,7 +145,7 @@ class PubsubManager:
                 self._get_handler_messages(handler)
             )
 
-    async def _get_handler_messages(self, handler):
+    async def _get_handler_messages(self, handler: HandlerInterface) -> None:
         async for message in handler.message_iterator:  # type: ignore
             try:
                 channel_name = message.header.channel
@@ -196,7 +196,9 @@ class PubsubManager:
                 await self._forward_to_handlers(channel_name, content, header)
                 await self._execute_callbacks(channel_name, content, header.dict())
 
-    async def _forward_to_handlers(self, channel, content, header) -> None:
+    async def _forward_to_handlers(
+        self, channel: str, content: dict[str, Any], header: Any
+    ) -> None:
         for handler in self._handlers.values():
             await handler.publish_if_subscribed(channel, content, header.dict())
 

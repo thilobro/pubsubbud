@@ -47,3 +47,4 @@ class KafkaHandlerConfig(JsonConfig):
     port: int
     to_pubsub_topic: str
     from_pubsub_topic: str
+    connection_retries: int = 3  # Default to 3 retries if not specified
