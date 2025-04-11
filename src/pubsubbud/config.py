@@ -5,7 +5,7 @@ import pydantic
 
 class JsonConfig(pydantic.BaseModel):
     @classmethod
-    def from_json(cls, json_path):
+    def from_json(cls, json_path: str) -> "JsonConfig":
         with open(json_path) as f:
             json_config = json.load(f)
         return cls.model_validate(json_config)

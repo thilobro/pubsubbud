@@ -1,6 +1,6 @@
 import asyncio
 import json
-from typing import AsyncGenerator
+from typing import Any, AsyncGenerator
 
 import paho.mqtt.client as mqtt
 
@@ -17,10 +17,12 @@ class MqttBroker(BrokerInterface):
         self._client.connect(config.host, port=config.port)
         self._client.loop_start()
 
-    def _on_message(self, client, userdata, message) -> None:
+    def _on_message(
+        self, client: mqtt.Client, userdata: Any, message: mqtt.MQTTMessage
+    ) -> None:
         asyncio.run(self._add_message_to_queue(message))
 
-    async def _add_message_to_queue(self, message) -> None:
+    async def _add_message_to_queue(self, message: mqtt.MQTTMessage) -> None:
         await self._message_queue.put(message)
 
     async def subscribe(self, channel_name: str) -> None:

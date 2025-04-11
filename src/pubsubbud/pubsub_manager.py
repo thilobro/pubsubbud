@@ -176,7 +176,7 @@ class PubsubManager:
 
     async def _execute_callbacks(
         self, channel_name: str, content: dict[str, Any], header: dict[str, Any]
-    ):
+    ) -> None:
         try:
             callbacks = self._callbacks[channel_name]
             for callback in callbacks:
