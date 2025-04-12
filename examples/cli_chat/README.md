@@ -41,6 +41,46 @@ The chat client supports the following commands:
 
 ## Running the Example
 
+### Using Kubernetes with Minikube
+
+1. Start your Minikube cluster:
+```bash
+minikube start
+```
+
+2. Configure your terminal to use Minikube's Docker daemon:
+```bash
+eval $(minikube docker-env)
+```
+
+3. Build the chat server Docker image:
+```bash
+docker build -t cli-chat-server:latest .
+```
+
+4. Apply the Kubernetes configurations:
+```bash
+kubectl apply -f cli_chat_server.yaml
+kubectl apply -f ingress-svc.yaml
+```
+
+5. Enable the Ingress addon in Minikube:
+```bash
+minikube addons enable ingress
+```
+
+6. Get the Minikube IP:
+```bash
+minikube ip
+```
+
+7. Run the client locally (use the Minikube IP from step 6):
+```bash
+poetry run python cli_chat_client.py --host <minikube-ip>
+```
+
+Note: When using Minikube's Docker daemon, make sure your cli_chat_server.yaml references the image as `imagePullPolicy: Never` to use the locally built image.
+
 ### Using Docker Compose (Recommended)
 
 1. Start the server and Redis:
@@ -97,4 +137,20 @@ The example uses several configuration files in the `configs/` directory:
 ## Network Ports
 
 - WebSocket Server: 8765
-- Redis: 6379 
+- Redis: 6379
+
+## Client Command-Line Interface
+
+The client supports the following command-line arguments:
+- `--host`: Specify the chat server host (default: localhost)
+- `--port`: Specify the WebSocket port (default: 8765)
+- `--name`: Set your username (if not provided, you'll be prompted)
+
+Example usage:
+```bash
+# Connect to a specific host
+poetry run python cli_chat_client.py --host chat.example.com
+
+# Connect with a specific port and username
+poetry run python cli_chat_client.py --port 9000 --name Alice
+``` 

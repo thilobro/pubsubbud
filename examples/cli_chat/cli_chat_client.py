@@ -1,3 +1,4 @@
+import argparse
 import asyncio
 import curses
 import json
@@ -7,7 +8,9 @@ from websockets.asyncio.client import connect
 
 
 class CLIChatClient:
-    def __init__(self, name):
+    def __init__(self, name, host, port):
+        self._host = host
+        self._port = port
         self._current_room = "lobby"
         self._history = ""
         self._char_buffer = ""
@@ -110,7 +113,7 @@ class CLIChatClient:
         await connection.send(json.dumps(room_msg))
 
     async def _run(self, stdscr):
-        async with connect("ws://localhost:8765") as connection:
+        async with connect(f"ws://{self._host}:{self._port}") as connection:
             try:
                 async with asyncio.TaskGroup() as tg:
                     tg.create_task(self._read_console(stdscr, connection))
@@ -132,7 +135,19 @@ class CLIChatClient:
         curses.wrapper(self._curses_wrapper)
 
 
+def get_cli_args() -> argparse.Namespace:
+    parser = argparse.ArgumentParser(
+        prog="CLI Chat Client",
+        description="Chat in your terminal.",
+        epilog="",
+    )
+    parser.add_argument("-p", "--port", default="8765")
+    parser.add_argument("--host", default="localhost")
+    return parser.parse_args()
+
+
 if __name__ == "__main__":
+    args = get_cli_args()
     name = input("Enter your name: ")
-    chat = CLIChatClient(name)
+    chat = CLIChatClient(name, args.host, args.port)
     chat.run()
