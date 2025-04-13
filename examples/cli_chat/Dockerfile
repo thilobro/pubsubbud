@@ -5,6 +5,7 @@ WORKDIR /app
 COPY . /app
 
 RUN pip install --no-cache-dir poetry
+RUN poetry add duckdb
 RUN poetry install
 WORKDIR /app/examples/cli_chat
 
