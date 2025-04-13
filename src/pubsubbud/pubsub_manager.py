@@ -2,6 +2,8 @@ import asyncio
 import http
 import json
 import logging
+from fnmatch import fnmatch
+from itertools import chain
 from typing import Any, Optional
 
 from pubsubbud.broker.broker_interface import BrokerInterface
@@ -23,6 +25,7 @@ class PubsubManager:
         self._logger = logger
         self._channels: list[str] = []
         self._callbacks: dict[str, list[PubsubCallback]] = {}
+        self._pattern_callbacks: dict[str, list[PubsubCallback]] = {}
         self._uuid = config.uuid
         self._broker = broker
         self._handlers: dict[str, HandlerInterface] = {}
@@ -53,22 +56,38 @@ class PubsubManager:
     async def register_callback(
         self, channel_name: str, callback: PubsubCallback
     ) -> None:
-        try:
-            self._callbacks[channel_name].append(callback)
-        except KeyError:
-            self._callbacks[channel_name] = [callback]
-        await self._add_channel(channel_name)
+        if "*" in channel_name:
+            try:
+                self._pattern_callbacks[channel_name].append(callback)
+            except KeyError:
+                self._pattern_callbacks[channel_name] = [callback]
+        else:
+            try:
+                self._callbacks[channel_name].append(callback)
+            except KeyError:
+                self._callbacks[channel_name] = [callback]
+            await self._add_channel(channel_name)
 
     async def unregister_callback(
         self, channel_name: str, callback: Optional[PubsubCallback] = None
     ) -> None:
         try:
-            if callback:
-                self._callbacks[channel_name].remove(callback)
-                if not self._callbacks[channel_name]:
-                    del self._callbacks[channel_name]
+            if "*" in channel_name:
+                # Handle pattern callbacks
+                if callback:
+                    self._pattern_callbacks[channel_name].remove(callback)
+                    if not self._pattern_callbacks[channel_name]:
+                        del self._pattern_callbacks[channel_name]
+                else:
+                    del self._pattern_callbacks[channel_name]
             else:
-                del self._callbacks[channel_name]
+                # Handle exact match callbacks
+                if callback:
+                    self._callbacks[channel_name].remove(callback)
+                    if not self._callbacks[channel_name]:
+                        del self._callbacks[channel_name]
+                else:
+                    del self._callbacks[channel_name]
             await self._cleanup_channels()
 
         except KeyError:
@@ -101,8 +120,16 @@ class PubsubManager:
             await self._remove_channel(channel_name)
 
     def _has_subscribers(self, channel_name: str) -> bool:
+        # Check exact matches
         if channel_name in self._callbacks.keys():
             return True
+
+        # Check pattern matches
+        for pattern in self._pattern_callbacks.keys():
+            if fnmatch(channel_name, pattern):
+                return True
+
+        # Check handlers
         for handler in self._handlers.values():
             if handler.has_subscribers(channel_name):
                 return True
@@ -174,15 +201,28 @@ class PubsubManager:
         self._run_message_task()
         self._run_handler_tasks()
 
+    def _get_pattern_callbacks(self, channel_name: str) -> list[PubsubCallback]:
+        return list(
+            chain.from_iterable(
+                [
+                    callback
+                    for pattern, callback in self._pattern_callbacks.items()
+                    if fnmatch(channel_name, pattern)
+                ]
+            )
+        )
+
     async def _execute_callbacks(
         self, channel_name: str, content: dict[str, Any], header: dict[str, Any]
     ) -> None:
         try:
             callbacks = self._callbacks[channel_name]
-            for callback in callbacks:
-                await callback(content, header)
         except KeyError:
-            pass
+            callbacks = []
+        pattern_callbacks = self._get_pattern_callbacks(channel_name)
+        callbacks += pattern_callbacks
+        for callback in callbacks:
+            await callback(content, header)
 
     async def _read_messages(self) -> None:
         async for message in self._broker.read_messages():
