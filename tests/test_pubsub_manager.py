@@ -201,3 +201,137 @@ async def test_multiple_handlers(test_pubsub_manager):
         handler.publish_if_subscribed.assert_awaited_once_with(
             "test_channel", {"test": "data"}, {"channel": "test_channel"}
         )
+
+
+@pytest.mark.asyncio
+async def test_pattern_callback_registration(test_pubsub_manager):
+    async def test_callback(content, header):
+        pass
+
+    # Register pattern callback
+    await test_pubsub_manager.register_callback("test.*", test_callback)
+    assert "test.*" in test_pubsub_manager._pattern_callbacks
+    assert len(test_pubsub_manager._pattern_callbacks["test.*"]) == 1
+    assert test_callback in test_pubsub_manager._pattern_callbacks["test.*"]
+
+    # Register another callback for same pattern
+    async def test_callback2(content, header):
+        pass
+
+    await test_pubsub_manager.register_callback("test.*", test_callback2)
+    assert len(test_pubsub_manager._pattern_callbacks["test.*"]) == 2
+
+
+@pytest.mark.asyncio
+async def test_pattern_callback_matching(test_pubsub_manager):
+    received_messages = []
+
+    async def test_callback(content, header):
+        received_messages.append((content, header))
+
+    # Register pattern callback
+    await test_pubsub_manager.register_callback("test.*", test_callback)
+
+    # Test matching patterns
+    test_patterns = [
+        ("test.123", True),
+        ("test.abc", True),
+        ("test", False),
+        ("other.123", False),
+        ("test.123.456", True),
+    ]
+
+    for channel, should_match in test_patterns:
+        mock_message = MagicMock()
+        mock_message.header.channel = channel
+        mock_message.content = {"test": "data"}
+        mock_message.header.dict.return_value = {"channel": channel}
+
+        test_pubsub_manager._broker.read_messages.return_value.__aiter__.return_value = [
+            mock_message
+        ]
+        test_pubsub_manager.run()
+        await asyncio.sleep(0.1)
+
+        if should_match:
+            assert len(received_messages) == 1
+            assert received_messages[0][0] == {"test": "data"}
+            received_messages.clear()
+        else:
+            assert len(received_messages) == 0
+
+
+@pytest.mark.asyncio
+async def test_multiple_pattern_callbacks(test_pubsub_manager):
+    received_messages = []
+
+    async def test_callback1(content, header):
+        received_messages.append(("callback1", content, header))
+
+    async def test_callback2(content, header):
+        received_messages.append(("callback2", content, header))
+
+    # Register multiple pattern callbacks
+    await test_pubsub_manager.register_callback("test.*", test_callback1)
+    await test_pubsub_manager.register_callback("*.123", test_callback2)
+
+    # Test message that matches both patterns
+    mock_message = MagicMock()
+    mock_message.header.channel = "test.123"
+    mock_message.content = {"test": "data"}
+    mock_message.header.dict.return_value = {"channel": "test.123"}
+
+    test_pubsub_manager._broker.read_messages.return_value.__aiter__.return_value = [
+        mock_message
+    ]
+    test_pubsub_manager.run()
+    await asyncio.sleep(0.1)
+
+    assert len(received_messages) == 2
+    assert ("callback1", {"test": "data"}, {"channel": "test.123"}) in received_messages
+    assert ("callback2", {"test": "data"}, {"channel": "test.123"}) in received_messages
+
+
+@pytest.mark.asyncio
+async def test_pattern_callback_cleanup(test_pubsub_manager):
+    async def test_callback(content, header):
+        pass
+
+    # Register pattern callback
+    await test_pubsub_manager.register_callback("test.*", test_callback)
+    assert "test.*" in test_pubsub_manager._pattern_callbacks
+
+    # Unregister callback
+    await test_pubsub_manager.unregister_callback("test.*", test_callback)
+    assert "test.*" not in test_pubsub_manager._pattern_callbacks
+
+
+@pytest.mark.asyncio
+async def test_pattern_and_exact_callback(test_pubsub_manager):
+    received_messages = []
+
+    async def pattern_callback(content, header):
+        received_messages.append(("pattern", content, header))
+
+    async def exact_callback(content, header):
+        received_messages.append(("exact", content, header))
+
+    # Register both pattern and exact callbacks
+    await test_pubsub_manager.register_callback("test.*", pattern_callback)
+    await test_pubsub_manager.register_callback("test.123", exact_callback)
+
+    # Test message that matches both
+    mock_message = MagicMock()
+    mock_message.header.channel = "test.123"
+    mock_message.content = {"test": "data"}
+    mock_message.header.dict.return_value = {"channel": "test.123"}
+
+    test_pubsub_manager._broker.read_messages.return_value.__aiter__.return_value = [
+        mock_message
+    ]
+    test_pubsub_manager.run()
+    await asyncio.sleep(0.1)
+
+    assert len(received_messages) == 2
+    assert ("pattern", {"test": "data"}, {"channel": "test.123"}) in received_messages
+    assert ("exact", {"test": "data"}, {"channel": "test.123"}) in received_messages

@@ -1,11 +1,14 @@
 import json
+from typing import Type, TypeVar
 
 import pydantic
+
+T = TypeVar("T", bound="JsonConfig")
 
 
 class JsonConfig(pydantic.BaseModel):
     @classmethod
-    def from_json(cls, json_path: str) -> "JsonConfig":
+    def from_json(cls: Type[T], json_path: str) -> T:
         with open(json_path) as f:
             json_config = json.load(f)
         return cls.model_validate(json_config)

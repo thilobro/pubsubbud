@@ -6,6 +6,7 @@ PubsubBud is a modular publish-subscribe framework that simplifies communication
 
 - Single message broker architecture for consistent message delivery
 - Multiple protocol handlers for client communication
+- Pattern-based message subscription support
 - Modular design for easy extension
 - Async/await support
 - Type-safe message handling
@@ -63,6 +64,29 @@ PubsubBud uses Pydantic models for configuration. Example configurations can be 
 - `pubsub.json`: PubsubManager settings
 
 ## Examples
+
+### Pattern-Based Subscriptions
+
+PubsubBud supports pattern matching for message subscriptions using shell-style wildcards:
+
+```python
+# Subscribe to all channels starting with "sensor."
+async def temperature_callback(content: dict, header: dict):
+    print(f"Temperature reading: {content['temperature']}")
+    
+await pubsub_manager.register_callback("sensor.*", temperature_callback)
+
+# This will match channels like:
+# - sensor.temperature
+# - sensor.humidity
+# - sensor.pressure
+```
+
+Pattern matching supports:
+- `*`: Matches any sequence of characters
+- `?`: Matches any single character
+- `[seq]`: Matches any character in seq
+- `[!seq]`: Matches any character not in seq
 
 Check the `examples/` directory for:
 - Basic usage examples
