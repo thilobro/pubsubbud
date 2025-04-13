@@ -4,6 +4,7 @@ from abc import ABC, abstractmethod
 from typing import Any, AsyncIterable, Optional
 
 from pubsubbud.custom_types import HandlerPublishCallback
+from pubsubbud.helpers import get_current_timestamp
 from pubsubbud.models import BrokerMessage
 
 
@@ -74,9 +75,9 @@ class HandlerInterface(ABC):
         self, channel_name: str, content: dict[str, Any], header: dict[str, Any]
     ) -> None:
         if self.has_subscribers(channel_name):
-            interface_ids = self._subscribed_channels[channel_name]
-            for interface_id in interface_ids:
-                await self.publish(interface_id, content, header)
+            handler_ids = self._subscribed_channels[channel_name]
+            for handler_id in handler_ids:
+                await self.publish(handler_id, content, header)
 
     async def _message_iterator(self) -> AsyncIterable:
         while True:

@@ -4,6 +4,7 @@ import json
 import logging
 from fnmatch import fnmatch
 from itertools import chain
+from sys import exc_info
 from typing import Any, Optional
 
 from pubsubbud.broker.broker_interface import BrokerInterface
@@ -160,10 +161,12 @@ class PubsubManager:
         else:
             raise ValueError(f"Subscription type not supported: {subscription_type}.")
 
-    async def _handle_pubsub_message(self, message: BrokerMessage) -> None:
+    async def _handle_pubsub_message(
+        self, message: BrokerMessage, origin_id: str = "pubsub"
+    ) -> None:
         channel_name = message.header.channel
         content = message.content
-        await self.publish(channel_name, content, True)
+        await self.publish(channel_name, content, True, origin_id)
 
     def _run_handler_tasks(self) -> None:
         for handler in self._handlers.values():
@@ -184,7 +187,7 @@ class PubsubManager:
                         message, handler.name, handler_id
                     )
                 else:
-                    await self._handle_pubsub_message(message)
+                    await self._handle_pubsub_message(message, handler_id)
                 ack_header = {
                     "ack_id": message_id,
                     "status_code": http.HTTPStatus.OK,
@@ -222,7 +225,10 @@ class PubsubManager:
         pattern_callbacks = self._get_pattern_callbacks(channel_name)
         callbacks += pattern_callbacks
         for callback in callbacks:
-            await callback(content, header)
+            try:
+                await callback(content, header)
+            except Exception:
+                self._logger.warning("Error executing callback.", exc_info=True)
 
     async def _read_messages(self) -> None:
         async for message in self._broker.read_messages():
@@ -233,14 +239,28 @@ class PubsubManager:
                 self._logger.info(f"Message from broker: {message}")
                 if "/" in channel_name:
                     channel_name = channel_name.split("/")[1]
-                await self._forward_to_handlers(channel_name, content, header)
+                await self.forward_to_handlers(channel_name, content, header)
                 await self._execute_callbacks(channel_name, content, header.dict())
 
-    async def _forward_to_handlers(
-        self, channel: str, content: dict[str, Any], header: Any
+    async def forward_to_handlers(
+        self,
+        channel: str,
+        content: dict[str, Any],
+        header: Any,
+        handler_id: Optional[str] = None,
+        handler_type: Optional[str] = None,
     ) -> None:
-        for handler in self._handlers.values():
-            await handler.publish_if_subscribed(channel, content, header.dict())
+        if not handler_id and not handler_type:
+            for handler in self._handlers.values():
+                await handler.publish_if_subscribed(channel, content, header.dict())
+        elif handler_id and handler_type:
+            await self._handlers[handler_type].publish(
+                handler_id=handler_id, content=content, header=header
+            )
+        else:
+            self._logger.warning(
+                f"Unable to foward to handler for handler id {handler_id} and handler type {handler_type}. Both must be set to forward to a specific client."
+            )
 
     def add_handler(self, handler: HandlerInterface) -> None:
         self._handlers[handler.name] = handler
@@ -256,11 +276,15 @@ class PubsubManager:
         await self._broker.close()
 
     async def publish(
-        self, channel_name: str, data: dict[str, Any], internal: bool = False
+        self,
+        channel_name: str,
+        data: dict[str, Any],
+        internal: bool = False,
+        origin_id: str = "pubsub",
     ) -> None:
         message = {}
         message["content"] = data
-        message["header"] = create_header(channel_name)
+        message["header"] = create_header(channel_name, origin_id)
         if internal:
             channel_name = f"{self._uuid}/{channel_name}"
         self._logger.info(f"Message to broker: {message}, {channel_name}")

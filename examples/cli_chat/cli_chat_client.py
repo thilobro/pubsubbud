@@ -1,6 +1,7 @@
 import argparse
 import asyncio
 import curses
+import datetime
 import json
 import uuid
 
@@ -11,13 +12,16 @@ class CLIChatClient:
     def __init__(self, name, host, port):
         self._host = host
         self._port = port
-        self._current_room = "lobby"
+        self._current_room = None
         self._history = ""
         self._char_buffer = ""
         self._name = name
 
     def _add_to_buffer(self, line):
         self._history += line + "\n"
+
+    def _clear_buffer(self):
+        self._history = ""
 
     def _show_buffer(self, char_buffer, stdscr):
         max_y, max_x = stdscr.getmaxyx()
@@ -37,8 +41,12 @@ class CLIChatClient:
             await self._join_room(obj, connection)
 
     async def _join_room(self, room_name, connection):
-        await self._send_unsub_message(f"room.{self._current_room}", connection)
+        if self._current_room:
+            await self._send_unsub_message(f"room.{self._current_room}", connection)
         await self._send_sub_message(f"room.{room_name}", connection)
+        self._clear_buffer()
+        self._add_to_buffer(f"Joined room {room_name}.")
+        await self._send_history_message(room_name, connection)
         self._current_room = room_name
 
     async def _update_screen(self, stdscr, connection):
@@ -65,10 +73,20 @@ class CLIChatClient:
             await self._update_screen(stdscr, connection)
             await asyncio.sleep(0.001)
 
+    async def _send_history_message(self, room_name, connection):
+        his_msg = {
+            "header": {
+                "message_id": str(uuid.uuid4()),
+                "channel": "history_request",
+            },
+            "content": {"room": room_name},
+        }
+        await connection.send(json.dumps(his_msg))
+
     async def _send_sub_message(self, channel_name, connection):
         sub_msg = {
             "header": {
-                "message_id": str(uuid.uuid4),
+                "message_id": str(uuid.uuid4()),
                 "channel": "subscription",
             },
             "content": {
@@ -81,7 +99,7 @@ class CLIChatClient:
     async def _send_unsub_message(self, channel_name, connection):
         sub_msg = {
             "header": {
-                "message_id": str(uuid.uuid4),
+                "message_id": str(uuid.uuid4()),
                 "channel": "subscription",
             },
             "content": {
@@ -92,22 +110,39 @@ class CLIChatClient:
         await connection.send(json.dumps(sub_msg))
 
     async def _handle_messages(self, stdscr, connection):
-        await self._send_sub_message(f"room.{self._current_room}", connection)
+        await self._send_sub_message("history_reply", connection)
         async for message in connection:
             message = json.loads(message)
             if "ack_id" not in message["header"].keys():
-                name = message["content"]["from"]
-                if name == self._name:
-                    name = name + " (You)"
-                message = (
-                    f"({self._current_room}) > {name}: {message['content']['message']}"
-                )
-                self._add_to_buffer(message)
-                self._show_buffer(self._char_buffer, stdscr)
+                channel = message["header"]["channel"]
+                if channel == "history_reply":
+                    history = message["content"]["history"]
+                    for line in history:
+                        timestamp = datetime.datetime.fromtimestamp(
+                            line["timestamp"]
+                        ).isoformat(timespec="minutes", sep=" ")
+                        room = line["room"]
+                        name = line["sender"]
+                        content = line["message"]
+                        message = f"[{timestamp}] ({room}) > {name}: {content}"
+                        self._add_to_buffer(message)
+                elif channel == f"room.{self._current_room}":
+                    name = message["content"]["from"]
+                    if name == self._name:
+                        name = name + " (You)"
+                    timestamp = datetime.datetime.fromtimestamp(
+                        message["header"]["timestamp"]
+                    ).isoformat(timespec="minutes", sep=" ")
+                    message = f"[{timestamp}] ({self._current_room}) > {name}: {message['content']['message']}"
+                    self._add_to_buffer(message)
+            self._show_buffer(self._char_buffer, stdscr)
 
     async def _send_chat_message(self, message, connection):
         room_msg = {
-            "header": {"message_id": "0", "channel": f"room.{self._current_room}"},
+            "header": {
+                "message_id": str(uuid.uuid4()),
+                "channel": f"room.{self._current_room}",
+            },
             "content": {"message": message, "from": self._name},
         }
         await connection.send(json.dumps(room_msg))
@@ -115,6 +150,7 @@ class CLIChatClient:
     async def _run(self, stdscr):
         async with connect(f"ws://{self._host}:{self._port}") as connection:
             try:
+                await self._join_room("lobby", connection)
                 async with asyncio.TaskGroup() as tg:
                     tg.create_task(self._read_console(stdscr, connection))
                     tg.create_task(self._handle_messages(stdscr, connection))
