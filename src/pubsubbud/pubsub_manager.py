@@ -4,7 +4,6 @@ import json
 import logging
 from fnmatch import fnmatch
 from itertools import chain
-from sys import exc_info
 from typing import Any, Optional
 
 from pubsubbud.broker.broker_interface import BrokerInterface
@@ -16,12 +15,39 @@ from pubsubbud.models import BrokerMessage
 
 
 class PubsubManager:
+    """A manager class for handling pub/sub operations with message brokers.
+
+    This class manages pub/sub operations including:
+    - Channel subscription and unsubscription
+    - Message publishing and receiving
+    - Callback registration and execution
+    - Handler management and message forwarding
+
+    Attributes:
+        _message_task: Task for reading messages from the broker
+        _logger: Logger instance for logging operations
+        _channels: List of active channels
+        _callbacks: Dictionary mapping channel names to their callbacks
+        _pattern_callbacks: Dictionary mapping pattern-based channel names to their callbacks
+        _uuid: Unique identifier for this manager instance
+        _broker: Broker interface instance
+        _handlers: Dictionary mapping handler names to their instances
+        _handler_tasks: Dictionary mapping handler names to their tasks
+    """
+
     def __init__(
         self,
         config: PubsubManagerConfig,
         broker: BrokerInterface,
         logger: logging.Logger,
     ) -> None:
+        """Initialize the PubsubManager.
+
+        Args:
+            config: Configuration for the pubsub manager
+            broker: Broker interface instance for message handling
+            logger: Logger instance for logging operations
+        """
         self._message_task: Optional[asyncio.Task] = None
         self._logger = logger
         self._channels: list[str] = []
@@ -33,12 +59,18 @@ class PubsubManager:
         self._handler_tasks: dict[str, asyncio.Task] = {}
 
     async def _cleanup_channels(self) -> None:
+        """Remove channels that no longer have any subscribers."""
         for channel_name in self._channels:
             if not self._has_subscribers(channel_name):
                 self._logger.info(f"Removing channel {channel_name}.")
                 await self._remove_channel(channel_name)
 
     async def _add_channel(self, channel_name: str) -> None:
+        """Add a new channel to the subscription list.
+
+        Args:
+            channel_name: Name of the channel to add
+        """
         self._logger.info(f"Adding channel {channel_name}")
         if channel_name not in self._channels:
             await self._broker.subscribe(channel_name)
@@ -48,6 +80,11 @@ class PubsubManager:
         await self._cleanup_channels()
 
     async def _remove_channel(self, channel_name: str) -> None:
+        """Remove a channel from the subscription list.
+
+        Args:
+            channel_name: Name of the channel to remove
+        """
         if channel_name in self._channels:
             await self._broker.unsubscribe(channel_name)
             await self._broker.unsubscribe(f"{self._uuid}/{channel_name}")
@@ -57,6 +94,12 @@ class PubsubManager:
     async def register_callback(
         self, channel_name: str, callback: PubsubCallback
     ) -> None:
+        """Register a callback function for a channel.
+
+        Args:
+            channel_name: Name of the channel to register the callback for
+            callback: Callback function to be executed when messages are received
+        """
         if "*" in channel_name:
             try:
                 self._pattern_callbacks[channel_name].append(callback)
@@ -72,6 +115,12 @@ class PubsubManager:
     async def unregister_callback(
         self, channel_name: str, callback: Optional[PubsubCallback] = None
     ) -> None:
+        """Unregister a callback function from a channel.
+
+        Args:
+            channel_name: Name of the channel to unregister the callback from
+            callback: Optional specific callback to unregister. If None, all callbacks for the channel are removed.
+        """
         try:
             if "*" in channel_name:
                 # Handle pattern callbacks
@@ -102,6 +151,13 @@ class PubsubManager:
         handler_name: Optional[str] = None,
         handler_id: Optional[str] = None,
     ) -> None:
+        """Subscribe to a channel, optionally for a specific handler.
+
+        Args:
+            channel_name: Name of the channel to subscribe to
+            handler_name: Optional name of the handler subscribing
+            handler_id: Optional ID of the handler subscribing
+        """
         if handler_id and handler_name:
             self._handlers[handler_name].subscribe(channel_name, handler_id)
         await self._add_channel(channel_name)
@@ -112,6 +168,13 @@ class PubsubManager:
         handler_name: Optional[str] = None,
         handler_id: Optional[str] = None,
     ) -> None:
+        """Unsubscribe from a channel, optionally for a specific handler.
+
+        Args:
+            channel_name: Name of the channel to unsubscribe from
+            handler_name: Optional name of the handler unsubscribing
+            handler_id: Optional ID of the handler unsubscribing
+        """
         if handler_name:
             self._handlers[handler_name].unsubscribe(channel_name, handler_id)
         else:
@@ -121,6 +184,14 @@ class PubsubManager:
             await self._remove_channel(channel_name)
 
     def _has_subscribers(self, channel_name: str) -> bool:
+        """Check if a channel has any subscribers.
+
+        Args:
+            channel_name: Name of the channel to check
+
+        Returns:
+            bool: True if the channel has subscribers, False otherwise
+        """
         # Check exact matches
         if channel_name in self._callbacks.keys():
             return True
@@ -137,9 +208,11 @@ class PubsubManager:
         return False
 
     def _run_message_task(self) -> None:
+        """Start the task for reading messages from the broker."""
         self._message_task = asyncio.create_task(self._read_messages())
 
     async def _restart_message_task(self) -> None:
+        """Restart the message reading task."""
         if self._message_task:
             self._message_task.cancel()
             try:
@@ -152,6 +225,13 @@ class PubsubManager:
     async def _handle_subscription_message(
         self, message: BrokerMessage, handler_name: str, handler_id: str
     ) -> None:
+        """Handle subscription-related messages from handlers.
+
+        Args:
+            message: The subscription message to handle
+            handler_name: Name of the handler sending the message
+            handler_id: ID of the handler sending the message
+        """
         subscription_type = message.content["subscription_type"]
         subscription_channel = message.content["subscription_channel"]
         if subscription_type == "subscription":
@@ -164,11 +244,18 @@ class PubsubManager:
     async def _handle_pubsub_message(
         self, message: BrokerMessage, origin_id: str = "pubsub"
     ) -> None:
+        """Handle pub/sub messages from handlers.
+
+        Args:
+            message: The message to handle
+            origin_id: ID of the message origin, defaults to "pubsub"
+        """
         channel_name = message.header.channel
         content = message.content
         await self.publish(channel_name, content, True, origin_id)
 
     def _run_handler_tasks(self) -> None:
+        """Start tasks for all registered handlers."""
         for handler in self._handlers.values():
             handler.run()
             self._handler_tasks[handler.name] = asyncio.create_task(
@@ -176,6 +263,11 @@ class PubsubManager:
             )
 
     async def _get_handler_messages(self, handler: HandlerInterface) -> None:
+        """Process messages from a handler.
+
+        Args:
+            handler: The handler to process messages from
+        """
         async for message in handler.message_iterator:  # type: ignore
             try:
                 channel_name = message.header.channel
@@ -201,10 +293,19 @@ class PubsubManager:
                 await handler.publish(handler_id, {}, ack_header)
 
     def run(self) -> None:
+        """Start the pub/sub manager by running message and handler tasks."""
         self._run_message_task()
         self._run_handler_tasks()
 
     def _get_pattern_callbacks(self, channel_name: str) -> list[PubsubCallback]:
+        """Get all pattern-matching callbacks for a channel.
+
+        Args:
+            channel_name: Name of the channel to get callbacks for
+
+        Returns:
+            list[PubsubCallback]: List of matching callbacks
+        """
         return list(
             chain.from_iterable(
                 [
@@ -218,6 +319,13 @@ class PubsubManager:
     async def _execute_callbacks(
         self, channel_name: str, content: dict[str, Any], header: dict[str, Any]
     ) -> None:
+        """Execute all registered callbacks for a channel.
+
+        Args:
+            channel_name: Name of the channel to execute callbacks for
+            content: Content of the message
+            header: Header information of the message
+        """
         try:
             callbacks = self._callbacks[channel_name]
         except KeyError:
@@ -231,6 +339,7 @@ class PubsubManager:
                 self._logger.warning("Error executing callback.", exc_info=True)
 
     async def _read_messages(self) -> None:
+        """Read and process messages from the broker."""
         async for message in self._broker.read_messages():
             if message:
                 header = message.header
@@ -250,6 +359,15 @@ class PubsubManager:
         handler_id: Optional[str] = None,
         handler_type: Optional[str] = None,
     ) -> None:
+        """Forward a message to appropriate handlers.
+
+        Args:
+            channel: Channel name the message is from
+            content: Content of the message
+            header: Header information of the message
+            handler_id: Optional specific handler ID to forward to
+            handler_type: Optional specific handler type to forward to
+        """
         if not handler_id and not handler_type:
             for handler in self._handlers.values():
                 await handler.publish_if_subscribed(channel, content, header.dict())
@@ -263,9 +381,15 @@ class PubsubManager:
             )
 
     def add_handler(self, handler: HandlerInterface) -> None:
+        """Add a new handler to the manager.
+
+        Args:
+            handler: The handler to add
+        """
         self._handlers[handler.name] = handler
 
     async def close(self) -> None:
+        """Close the pub/sub manager and clean up resources."""
         self._logger.info("Closing pubsub.")
         if self._message_task:
             self._message_task.cancel()
@@ -282,6 +406,14 @@ class PubsubManager:
         internal: bool = False,
         origin_id: str = "pubsub",
     ) -> None:
+        """Publish a message to a channel.
+
+        Args:
+            channel_name: Name of the channel to publish to
+            data: Data to publish
+            internal: Whether this is an internal message
+            origin_id: ID of the message origin, defaults to "pubsub"
+        """
         message = {}
         message["content"] = data
         message["header"] = create_header(channel_name, origin_id)
