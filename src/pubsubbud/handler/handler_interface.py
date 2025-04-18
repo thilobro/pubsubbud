@@ -4,7 +4,6 @@ from abc import ABC, abstractmethod
 from typing import Any, AsyncIterable, Optional
 
 from pubsubbud.custom_types import HandlerPublishCallback
-from pubsubbud.helpers import get_current_timestamp
 from pubsubbud.models import BrokerMessage
 
 
@@ -86,16 +85,26 @@ class HandlerInterface(ABC):
             - If both channel_name and handler_id are provided, only that specific subscription is removed
             - If only handler_id is provided, the client is unsubscribed from all channels
         """
+        channels_to_remove = []
         if channel_name and not handler_id:
-            del self._subscribed_channels[channel_name]
+            try:
+                del self._subscribed_channels[channel_name]
+            except KeyError:
+                self._logger.warning(
+                    f"Attempted to unsubscribe from non-existent channel: {channel_name}"
+                )
         elif channel_name and handler_id:
             self._subscribed_channels[channel_name].remove(handler_id)
-            if not self._subscribed_channels[channel_name]:
-                del self._subscribed_channels[channel_name]
+            if not self.has_subscribers(channel_name):
+                channels_to_remove.append(channel_name)
         else:  # only handler id
             for channel_name, handler_ids in self._subscribed_channels.items():
                 if handler_id in handler_ids:
                     self._subscribed_channels[channel_name].remove(handler_id)
+                    if not self.has_subscribers(channel_name):
+                        channels_to_remove.append(channel_name)
+        for channel_name in channels_to_remove:
+            del self._subscribed_channels[channel_name]
 
     def has_subscribers(self, channel_name: str) -> bool:
         """Check if a channel has any subscribers.
@@ -106,7 +115,10 @@ class HandlerInterface(ABC):
         Returns:
             bool: True if the channel has subscribers, False otherwise
         """
-        return channel_name in self._subscribed_channels.keys()
+        return (
+            channel_name in self._subscribed_channels.keys()
+            and self._subscribed_channels[channel_name] != []
+        )
 
     async def publish(
         self, handler_id: str, content: dict[str, Any], header: dict[str, Any]
