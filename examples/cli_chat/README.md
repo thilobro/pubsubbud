@@ -120,7 +120,6 @@ poetry run python cli_chat_client.py
 
 The example uses several configuration files in the `configs/` directory:
 - `redis_broker.json` - Redis connection settings
-- `pubsub.json` - PubSub manager configuration
 - `websocket_handler.json` - WebSocket handler settings
 
 ## Architecture

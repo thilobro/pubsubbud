@@ -12,7 +12,6 @@ from pubsubbud.config import (
     KafkaBrokerConfig,
     KafkaHandlerConfig,
     MqttBrokerConfig,
-    PubsubManagerConfig,
     RedisBrokerConfig,
     WebsocketHandlerConfig,
 )
@@ -78,9 +77,7 @@ def test_websocket_handler(test_logger):
 @pytest.fixture
 def test_pubsub_manager(test_logger):
     test_broker = None
-    ps_manager = PubsubManager(
-        config=PubsubManagerConfig(uuid="123"), broker=test_broker, logger=test_logger
-    )
+    ps_manager = PubsubManager(broker=test_broker, logger=test_logger)
     ps_manager._broker = AsyncMock()
     ps_manager._broker.read_messages = AsyncContextManager()
     return ps_manager

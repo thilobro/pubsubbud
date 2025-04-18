@@ -2,12 +2,12 @@ import asyncio
 import http
 import json
 import logging
+import uuid
 from fnmatch import fnmatch
 from itertools import chain
 from typing import Any, Optional
 
 from pubsubbud.broker.broker_interface import BrokerInterface
-from pubsubbud.config import PubsubManagerConfig
 from pubsubbud.custom_types import PubsubCallback
 from pubsubbud.handler.handler_interface import HandlerInterface
 from pubsubbud.helpers import create_header
@@ -37,14 +37,12 @@ class PubsubManager:
 
     def __init__(
         self,
-        config: PubsubManagerConfig,
         broker: BrokerInterface,
         logger: logging.Logger,
     ) -> None:
         """Initialize the PubsubManager.
 
         Args:
-            config: Configuration for the pubsub manager
             broker: Broker interface instance for message handling
             logger: Logger instance for logging operations
         """
@@ -53,7 +51,7 @@ class PubsubManager:
         self._channels: list[str] = []
         self._callbacks: dict[str, list[PubsubCallback]] = {}
         self._pattern_callbacks: dict[str, list[PubsubCallback]] = {}
-        self._uuid = config.uuid
+        self._uuid = str(uuid.uuid4())
         self._broker = broker
         self._handlers: dict[str, HandlerInterface] = {}
         self._handler_tasks: dict[str, asyncio.Task] = {}
@@ -251,8 +249,9 @@ class PubsubManager:
             origin_id: ID of the message origin, defaults to "pubsub"
         """
         channel_name = message.header.channel
+        internal = message.header.internal
         content = message.content
-        await self.publish(channel_name, content, True, origin_id)
+        await self.publish(channel_name, content, internal, origin_id)
 
     def _run_handler_tasks(self) -> None:
         """Start tasks for all registered handlers."""
@@ -346,9 +345,9 @@ class PubsubManager:
                 channel_name = header.channel
                 content = message.content
                 self._logger.info(f"Message from broker: {message}")
+                await self.forward_to_handlers(channel_name, content, header)
                 if "/" in channel_name:
                     channel_name = channel_name.split("/")[1]
-                await self.forward_to_handlers(channel_name, content, header)
                 await self._execute_callbacks(channel_name, content, header.dict())
 
     async def forward_to_handlers(
@@ -404,7 +403,7 @@ class PubsubManager:
         channel_name: str,
         data: dict[str, Any],
         internal: bool = False,
-        origin_id: str = "pubsub",
+        origin_id: Optional[str] = None,
     ) -> None:
         """Publish a message to a channel.
 
@@ -414,6 +413,8 @@ class PubsubManager:
             internal: Whether this is an internal message
             origin_id: ID of the message origin, defaults to "pubsub"
         """
+        if not origin_id:
+            origin_id = self._uuid
         message = {}
         message["content"] = data
         message["header"] = create_header(channel_name, origin_id)

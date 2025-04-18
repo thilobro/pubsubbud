@@ -19,6 +19,7 @@ class HandlerInterface(ABC):
 
     This interface defines the core functionality required for any message handler
     implementation. Handlers manage client connections and message routing between
+
     clients and the pubsub system.
 
     Attributes:

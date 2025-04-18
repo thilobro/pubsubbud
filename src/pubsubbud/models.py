@@ -21,6 +21,7 @@ class BrokerMessageHeader(pydantic.BaseModel):
     channel: str
     origin_id: str
     timestamp: float = pydantic.Field(default_factory=time.time)
+    internal: bool = False
 
 
 class BrokerMessage(pydantic.BaseModel):

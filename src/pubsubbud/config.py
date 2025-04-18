@@ -32,16 +32,6 @@ class JsonConfig(pydantic.BaseModel):
         return cls.model_validate(json_config)
 
 
-class PubsubManagerConfig(JsonConfig):
-    """Configuration for the PubsubManager.
-
-    Attributes:
-        uuid: Unique identifier for the pubsub manager instance.
-    """
-
-    uuid: str
-
-
 class WebsocketHandlerConfig(JsonConfig):
     """Configuration for the WebSocket handler.
 
