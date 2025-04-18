@@ -131,19 +131,23 @@ class MqttHandler(HandlerInterface):
             channel_name: Optional name of the channel to unsubscribe from
             handler_id: Optional ID of the client to unsubscribe
         """
-        super().unsubscribe(channel_name, handler_id)
-        if handler_id and channel_name:
-            topic = self._to_pubsub_topic + "/" + handler_id
-            if not self.has_subscribers(channel_name):
-                self._client.unsubscribe(topic)
+        if channel_name and not handler_id:
+            # Unsubscribe all clients from the channel
+            try:
+                for h_id in self._subscribed_channels[channel_name]:
+                    topic = self._to_pubsub_topic + "/" + h_id
+                    self._client.unsubscribe(topic)
+            except KeyError:
+                self._logger.warning(
+                    f"Attempted to unsubscribe from non-existent channel: {channel_name}"
+                )
         elif handler_id:
+            # Unsubscribe specific client from specific channel
             topic = self._to_pubsub_topic + "/" + handler_id
             self._client.unsubscribe(topic)
-        elif channel_name:
-            if not self.has_subscribers(channel_name):
-                for handler_id in self._subscribed_channels[channel_name]:
-                    topic = self._to_pubsub_topic + "/" + handler_id
-                    self._client.unsubscribe(topic)
+
+        # Call super().unsubscribe after MQTT operations to maintain internal state
+        super().unsubscribe(channel_name, handler_id)
 
     async def _handle_connection_error(self, handler_id: str) -> bool:
         """Handle a connection error for an MQTT client.
