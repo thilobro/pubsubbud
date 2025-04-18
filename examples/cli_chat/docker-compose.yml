@@ -1,15 +1,17 @@
 services:
   redis:
-    image: redis
+    image: redis:latest
     ports:
       - "6379:6379"
     networks:
       - app-network
 
-  cli_chat_server:
+  cli-chat-server:
     build:
       context: ../../
       dockerfile: ./examples/cli_chat/Dockerfile
+    volumes:
+      - ./data:/data
     ports:
       - "8765:8765"
     environment:

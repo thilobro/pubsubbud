@@ -61,7 +61,6 @@ PubsubBud uses Pydantic models for configuration. Example configurations can be 
 - `redis_broker.json`: Redis broker settings
 - `mqtt_broker.json`: MQTT broker settings
 - `kafka_broker.json`: Kafka broker settings
-- `pubsub.json`: PubsubManager settings
 
 ## Examples
 

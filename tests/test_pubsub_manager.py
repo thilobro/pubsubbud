@@ -7,11 +7,12 @@ import pytest
 @pytest.mark.asyncio
 async def test_subscribe_unsubscribe(test_pubsub_manager):
     await test_pubsub_manager._subscribe("test")
-    calls = [call("test"), call("123/test")]
+    uuid = test_pubsub_manager._uuid  # Get the actual UUID
+    calls = [call("test"), call(f"{uuid}/test")]
     test_pubsub_manager._broker.subscribe.assert_has_awaits(calls)
 
     await test_pubsub_manager._unsubscribe("test")
-    calls = [call("test"), call("123/test")]
+    calls = [call("test"), call(f"{uuid}/test")]
     test_pubsub_manager._broker.unsubscribe.assert_has_awaits(calls)
 
 
@@ -161,9 +162,10 @@ async def test_subscription_message_handling(
         mock_message, test_websocket_handler.name, "test_id"
     )
 
-    # Verify subscription was processed
+    # Verify subscription was processed using actual UUID
+    uuid = test_pubsub_manager._uuid  # Get the actual UUID
     test_pubsub_manager._broker.subscribe.assert_has_awaits(
-        [call("test_channel"), call("123/test_channel")]
+        [call("test_channel"), call(f"{uuid}/test_channel")]
     )
 
 

@@ -7,7 +7,6 @@ import duckdb
 
 from pubsubbud.broker.redis_broker import RedisBroker
 from pubsubbud.config import (
-    PubsubManagerConfig,
     RedisBrokerConfig,
     WebsocketHandlerConfig,
 )
@@ -21,10 +20,15 @@ BROKER = os.environ.get("BROKER", "redis")
 class DuckDBHistoryLogger:
     def __init__(self, logger: logging.Logger) -> None:
         self._logger = logger
-        self._db = duckdb.connect()
-        self._db.sql(
-            "create table history (timestamp float, room string, sender string, message string);"
-        )
+        # Use file-based database in a mounted directory
+        self._db = duckdb.connect("/data/chat_history.db")
+        try:
+            # Create table if it doesn't exist
+            self._db.sql(
+                "create table if not exists history (timestamp float, room string, sender string, message string);"
+            )
+        except Exception as e:
+            self._logger.error(f"Error creating history table: {e}", exc_info=True)
 
     def log(self, message: str, timestamp: float, room: str, sender: str) -> None:
         try:
@@ -61,9 +65,7 @@ class CLIChatServer:
             broker = RedisBroker(config)
         else:
             raise ValueError(f"Unknown broker: {BROKER}")
-        pubsub_manager_config_path = "./configs/pubsub.json"
-        ps_manager_config = PubsubManagerConfig.from_json(pubsub_manager_config_path)
-        self._ps_manager = PubsubManager(ps_manager_config, broker, logger)
+        self._ps_manager = PubsubManager(broker=broker, logger=logger)
 
         websocket_handler_config_path = "./configs/websocket_handler.json"
         ws_handler_config = WebsocketHandlerConfig.from_json(

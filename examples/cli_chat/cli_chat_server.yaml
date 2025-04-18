@@ -56,13 +56,20 @@ spec:
     spec:
       containers:
         - name: cli-chat-server
-          image: cli_chat_server:latest
+          image: cli-chat-server:latest
           imagePullPolicy: Never  # Use this when building with minikube's docker daemon
           ports:
             - containerPort: 8765
           env:
             - name: BROKER
               value: "redis"
+          volumeMounts:
+            - name: chat-history
+              mountPath: /data
+      volumes:
+        - name: chat-history
+          persistentVolumeClaim:
+            claimName: chat-history-pvc
 ---
 apiVersion: networking.k8s.io/v1
 kind: Ingress

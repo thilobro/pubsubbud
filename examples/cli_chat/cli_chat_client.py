@@ -78,6 +78,7 @@ class CLIChatClient:
             "header": {
                 "message_id": str(uuid.uuid4()),
                 "channel": "history_request",
+                "internal": False,
             },
             "content": {"room": room_name},
         }
@@ -142,6 +143,7 @@ class CLIChatClient:
             "header": {
                 "message_id": str(uuid.uuid4()),
                 "channel": f"room.{self._current_room}",
+                "internal": False,
             },
             "content": {"message": message, "from": self._name},
         }

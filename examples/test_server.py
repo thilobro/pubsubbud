@@ -40,7 +40,6 @@ from pubsubbud.config import (
     KafkaHandlerConfig,
     MqttBrokerConfig,
     MqttHandlerConfig,
-    PubsubManagerConfig,
     RedisBrokerConfig,
     WebsocketHandlerConfig,
 )
@@ -81,8 +80,7 @@ async def main() -> None:
         broker = KafkaBroker(config)
     else:
         raise ValueError("Invalid broker specified")
-    ps_manager_config = PubsubManagerConfig.from_json(pubsub_handler_config_path)
-    ps_manager = PubsubManager(ps_manager_config, broker, logger)
+    ps_manager = PubsubManager(broker, logger)
 
     await ps_manager.register_callback("test", callback)
     await ps_manager.register_callback("test", callback2)
