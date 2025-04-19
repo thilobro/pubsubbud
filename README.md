@@ -89,7 +89,7 @@ Pattern matching supports:
 Check the `examples/` directory for:
 - Basic usage examples
 - Different broker configurations
-- Handler implementations
+- Possible client implementations
 - Complete application examples
 
 ## Development
