@@ -1,4 +1,6 @@
 import asyncio
+import http
+import json
 from unittest.mock import AsyncMock, MagicMock, call
 
 import pytest
@@ -337,3 +339,157 @@ async def test_pattern_and_exact_callback(test_pubsub_manager):
     assert len(received_messages) == 2
     assert ("pattern", {"test": "data"}, {"channel": "test.123"}) in received_messages
     assert ("exact", {"test": "data"}, {"channel": "test.123"}) in received_messages
+
+
+@pytest.mark.asyncio
+async def test_invalid_subscription_message(
+    test_pubsub_manager, test_websocket_handler
+):
+    """Test handling of invalid subscription messages."""
+    test_pubsub_manager.add_handler(test_websocket_handler)
+
+    # Test invalid subscription type
+    mock_message = MagicMock()
+    mock_message.header.channel = "subscription"
+    mock_message.header.origin_id = "test_id"
+    mock_message.header.message_id = "msg_id"
+    mock_message.content = {
+        "subscription_type": "invalid_type",
+        "subscription_channel": "test_channel",
+    }
+
+    with pytest.raises(
+        ValueError, match="Subscription type not supported: invalid_type"
+    ):
+        await test_pubsub_manager._handle_subscription_message(
+            mock_message, test_websocket_handler.name, "test_id"
+        )
+
+
+@pytest.mark.asyncio
+async def test_handler_message_processing_error(test_pubsub_manager):
+    """Test error handling in handler message processing."""
+    mock_handler = MagicMock()
+    mock_handler.name = "test_handler"
+    mock_handler.message_iterator = AsyncMock()
+    mock_handler.publish = AsyncMock()
+    test_pubsub_manager.add_handler(mock_handler)
+
+    # Create a message that will cause an error
+    error_message = MagicMock()
+    error_message.header.channel = "test_channel"
+    error_message.header.origin_id = "test_id"
+    error_message.header.message_id = "msg_id"
+    error_message.content = {"data": "test"}
+
+    # Make the handler raise an exception when processing the message
+    async def raise_error(*args, **kwargs):
+        raise Exception("Test error")
+
+    mock_handler.message_iterator.__aiter__.return_value = [error_message]
+    test_pubsub_manager._handle_pubsub_message = AsyncMock(side_effect=raise_error)
+
+    # Start processing messages
+    task = asyncio.create_task(test_pubsub_manager._get_handler_messages(mock_handler))
+    await asyncio.sleep(0.1)
+
+    # Verify error handling
+    mock_handler.publish.assert_awaited_with(
+        "test_id",
+        {},
+        {"ack_id": "msg_id", "status_code": http.HTTPStatus.INTERNAL_SERVER_ERROR},
+    )
+
+    task.cancel()
+    try:
+        await task
+    except asyncio.CancelledError:
+        pass
+
+
+@pytest.mark.asyncio
+async def test_specific_handler_forwarding(test_pubsub_manager):
+    """Test message forwarding to specific handlers."""
+    # Create two mock handlers
+    handler1 = MagicMock()
+    handler1.name = "handler1"
+    handler1.publish = AsyncMock()
+
+    handler2 = MagicMock()
+    handler2.name = "handler2"
+    handler2.publish = AsyncMock()
+
+    test_pubsub_manager.add_handler(handler1)
+    test_pubsub_manager.add_handler(handler2)
+
+    # Test forwarding to specific handler
+    content = {"test": "data"}
+    header = {"type": "test"}
+
+    await test_pubsub_manager.forward_to_handlers(
+        "test_channel", content, header, handler_id="client1", handler_type="handler1"
+    )
+
+    # Verify only handler1 received the message
+    handler1.publish.assert_awaited_once_with(
+        handler_id="client1", content=content, header=header
+    )
+    handler2.publish.assert_not_awaited()
+
+    # Test invalid handler forwarding
+    # Create a mock logger
+    mock_logger = MagicMock()
+    test_pubsub_manager._logger = mock_logger
+
+    await test_pubsub_manager.forward_to_handlers(
+        "test_channel", content, header, handler_id="client1", handler_type=None
+    )
+
+    # Verify warning was logged
+    mock_logger.warning.assert_called_once_with(
+        "Unable to foward to handler for handler id client1 and handler type None. Both must be set to forward to a specific client."
+    )
+
+
+@pytest.mark.asyncio
+async def test_internal_message_publishing(test_pubsub_manager):
+    """Test publishing internal messages."""
+    # Test internal message
+    await test_pubsub_manager.publish("test_channel", {"test": "data"}, internal=True)
+
+    # Get the actual call arguments
+    actual_topic, actual_message_json = test_pubsub_manager._broker.publish.call_args[0]
+    actual_message = json.loads(actual_message_json)
+
+    # Verify the topic
+    assert actual_topic == f"{test_pubsub_manager._uuid}/test_channel"
+
+    # Verify the message structure
+    assert actual_message["content"] == {"test": "data"}
+    assert actual_message["header"]["channel"] == "test_channel"
+    assert actual_message["header"]["origin_id"] == test_pubsub_manager._uuid
+    # message_id is random, just verify it exists
+    assert "message_id" in actual_message["header"]
+    assert "timestamp" in actual_message["header"]
+
+
+@pytest.mark.asyncio
+async def test_handler_task_management(test_pubsub_manager):
+    """Test handler task management."""
+    # Create mock handler
+    mock_handler = MagicMock()
+    mock_handler.name = "test_handler"
+    mock_handler.message_iterator = AsyncMock()
+    mock_handler.run = MagicMock()
+    test_pubsub_manager.add_handler(mock_handler)
+
+    # Run handler tasks
+    test_pubsub_manager._run_handler_tasks()
+
+    # Verify handler was started
+    mock_handler.run.assert_called_once()
+    assert "test_handler" in test_pubsub_manager._handler_tasks
+
+    # Clean up
+    for task in test_pubsub_manager._handler_tasks.values():
+        task.cancel()
