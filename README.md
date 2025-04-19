@@ -9,7 +9,6 @@ PubsubBud is a modular publish-subscribe framework that simplifies communication
 - Pattern-based message subscription support
 - Modular design for easy extension
 - Async/await support
-- Type-safe message handling
 - Automatic channel management
 
 ## Installation
