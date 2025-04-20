@@ -493,3 +493,161 @@ async def test_handler_task_management(test_pubsub_manager):
     # Clean up
     for task in test_pubsub_manager._handler_tasks.values():
         task.cancel()
+
+
+@pytest.mark.asyncio
+async def test_callback_execution_error(test_pubsub_manager):
+    """Test error handling during callback execution."""
+    # Replace the logger with a mock
+    mock_logger = MagicMock()
+    test_pubsub_manager._logger = mock_logger
+
+    async def failing_callback(content, header):
+        raise Exception("Test callback error")
+
+    # Register the failing callback
+    await test_pubsub_manager.register_callback("test_channel", failing_callback)
+
+    # Create a test message
+    mock_message = MagicMock()
+    mock_message.header.channel = "test_channel"
+    mock_message.content = {"test": "data"}
+    mock_message.header.dict.return_value = {"channel": "test_channel"}
+
+    # Execute callbacks
+    await test_pubsub_manager._execute_callbacks(
+        "test_channel", mock_message.content, mock_message.header.dict()
+    )
+
+    # Verify warning was logged
+    mock_logger.warning.assert_called_with("Error executing callback.", exc_info=True)
+
+
+@pytest.mark.asyncio
+async def test_handler_task_cleanup(test_pubsub_manager):
+    """Test cleanup of handler tasks."""
+    # Create mock handlers
+    handler1 = MagicMock()
+    handler1.name = "handler1"
+    handler1.stop = AsyncMock()
+
+    handler2 = MagicMock()
+    handler2.name = "handler2"
+    handler2.stop = AsyncMock()
+
+    test_pubsub_manager.add_handler(handler1)
+    test_pubsub_manager.add_handler(handler2)
+
+    # Create and store tasks that we can verify are cancelled
+    async def long_running_task():
+        try:
+            while True:
+                await asyncio.sleep(0.1)
+        except asyncio.CancelledError:
+            raise
+
+    test_pubsub_manager._handler_tasks = {
+        "handler1": asyncio.create_task(long_running_task()),
+        "handler2": asyncio.create_task(long_running_task()),
+    }
+
+    # Close the manager
+    await test_pubsub_manager.close()
+
+    # Give a short time for tasks to be cancelled
+    await asyncio.sleep(0.1)
+
+    # Verify all tasks were cancelled and handlers stopped
+    assert all(task.cancelled() for task in test_pubsub_manager._handler_tasks.values())
+    handler1.stop.assert_awaited_once()
+    handler2.stop.assert_awaited_once()
+
+
+@pytest.mark.asyncio
+async def test_message_task_restart(test_pubsub_manager):
+    """Test message task restart functionality."""
+    # Create initial message task
+    test_pubsub_manager._run_message_task()
+    original_task = test_pubsub_manager._message_task
+
+    # Restart the task
+    await test_pubsub_manager._restart_message_task()
+
+    # Verify original task was cancelled and new task created
+    assert original_task.cancelled()
+    assert test_pubsub_manager._message_task is not None
+    assert test_pubsub_manager._message_task is not original_task
+
+
+@pytest.mark.asyncio
+async def test_handler_message_processing_subscription(test_pubsub_manager):
+    """Test processing of subscription messages from handlers."""
+    mock_handler = MagicMock()
+    mock_handler.name = "test_handler"
+    mock_handler.message_iterator = AsyncMock()
+    mock_handler.publish = AsyncMock()
+    test_pubsub_manager.add_handler(mock_handler)
+
+    # Create a subscription message
+    sub_message = MagicMock()
+    sub_message.header.channel = "subscription"
+    sub_message.header.origin_id = "test_id"
+    sub_message.header.message_id = "msg_id"
+    sub_message.content = {
+        "subscription_type": "subscription",
+        "subscription_channel": "test_channel",
+    }
+
+    # Set up the handler to yield our test message
+    mock_handler.message_iterator.__aiter__.return_value = [sub_message]
+
+    # Start processing messages
+    task = asyncio.create_task(test_pubsub_manager._get_handler_messages(mock_handler))
+    await asyncio.sleep(0.1)
+
+    # Verify subscription was processed
+    mock_handler.publish.assert_awaited_with(
+        "test_id", {}, {"ack_id": "msg_id", "status_code": http.HTTPStatus.OK}
+    )
+
+    # Clean up
+    task.cancel()
+    try:
+        await task
+    except asyncio.CancelledError:
+        pass
+
+
+@pytest.mark.asyncio
+async def test_unsubscribe_nonexistent_channel(test_pubsub_manager):
+    """Test unsubscribing from a non-existent channel."""
+    # Try to unsubscribe from non-existent channel
+    await test_pubsub_manager._unsubscribe("nonexistent_channel")
+
+    # Verify broker unsubscribe was not called
+    test_pubsub_manager._broker.unsubscribe.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_forward_to_nonexistent_handler(test_pubsub_manager):
+    """Test forwarding to non-existent handler type."""
+    # Replace the logger with a mock
+    mock_logger = MagicMock()
+    test_pubsub_manager._logger = mock_logger
+
+    content = {"test": "data"}
+    header = {"type": "test"}
+
+    # Try to forward to non-existent handler
+    await test_pubsub_manager.forward_to_handlers(
+        "test_channel",
+        content,
+        header,
+        handler_id="client1",
+        handler_type="nonexistent_handler",
+    )
+
+    # Verify warning was logged with correct message
+    mock_logger.warning.assert_called_once_with(
+        "Unable to forward to handler nonexistent_handler with id client1. Handler not found."
+    )

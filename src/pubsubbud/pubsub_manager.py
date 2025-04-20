@@ -371,9 +371,14 @@ class PubsubManager:
             for handler in self._handlers.values():
                 await handler.publish_if_subscribed(channel, content, header.dict())
         elif handler_id and handler_type:
-            await self._handlers[handler_type].publish(
-                handler_id=handler_id, content=content, header=header
-            )
+            try:
+                await self._handlers[handler_type].publish(
+                    handler_id=handler_id, content=content, header=header
+                )
+            except KeyError:
+                self._logger.warning(
+                    f"Unable to forward to handler {handler_type} with id {handler_id}. Handler not found."
+                )
         else:
             self._logger.warning(
                 f"Unable to foward to handler for handler id {handler_id} and handler type {handler_type}. Both must be set to forward to a specific client."
