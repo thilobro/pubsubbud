@@ -94,7 +94,18 @@ class HandlerInterface(ABC):
                     f"Attempted to unsubscribe from non-existent channel: {channel_name}"
                 )
         elif channel_name and handler_id:
-            self._subscribed_channels[channel_name].remove(handler_id)
+            try:
+                self._subscribed_channels[channel_name].remove(handler_id)
+            except KeyError:
+                self._logger.warning(
+                    f"Attempted to unsubscribe from non-existent channel: {channel_name}"
+                )
+                return
+            except ValueError:
+                self._logger.warning(
+                    f"Attempted to unsubscribe from non-existent handler: {handler_id}"
+                )
+                return
             if not self.has_subscribers(channel_name):
                 channels_to_remove.append(channel_name)
         else:  # only handler id
