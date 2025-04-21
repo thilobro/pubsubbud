@@ -125,7 +125,7 @@ async def redis_broker(redis_broker_config):
 
 
 @pytest_asyncio.fixture
-async def kafka_handler():
+async def test_kafka_handler():
     logger = MagicMock()
     config = KafkaHandlerConfig(
         host="localhost",
@@ -135,17 +135,13 @@ async def kafka_handler():
         connection_retries=2,
     )
 
-    # Mock sleep to make tests faster
     with (
-        patch("asyncio.sleep", new_callable=AsyncMock),
-        patch("aiokafka.AIOKafkaProducer"),
-        patch("aiokafka.AIOKafkaConsumer"),
+        patch("aiokafka.AIOKafkaProducer") as mock_producer,
+        patch("aiokafka.AIOKafkaConsumer") as mock_consumer,
     ):
         handler = KafkaHandler("test", config, logger)
         handler._producer = AsyncMock()
         handler._consumer = AsyncMock()
-        handler._run_task = None
+        handler._run_task = None  # Initialize the task
         yield handler
-        await handler._producer.stop()
-        await handler._consumer.stop()
         await handler.stop()

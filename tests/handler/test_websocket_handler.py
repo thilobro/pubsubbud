@@ -1,3 +1,4 @@
+import asyncio
 import json
 from unittest.mock import AsyncMock, MagicMock, Mock
 
@@ -79,3 +80,59 @@ async def test_websocket_message_handling(test_websocket_handler):
     assert message2.header.origin_id == "123"
     assert message2.header.message_id == "msg2"
     assert message2.header.channel == "test_channel"
+
+
+@pytest.mark.asyncio
+async def test_websocket_handler_publish_error_handling(test_websocket_handler):
+    """Test error handling in publish method."""
+    # Mock _publish_callback to raise an error
+    test_websocket_handler._publish_callback = AsyncMock(
+        side_effect=HandlerConnectionError("Test error")
+    )
+    test_websocket_handler._handle_connection_error = AsyncMock(return_value=False)
+
+    await test_websocket_handler.publish("test_id", {}, {})
+
+    # Verify error handling was attempted
+    test_websocket_handler._handle_connection_error.assert_awaited_once_with("test_id")
+
+
+@pytest.mark.asyncio
+async def test_websocket_handler_unsubscribe_error_handling(test_websocket_handler):
+    """Test error handling in unsubscribe method."""
+    # Subscribe to create the channel
+    test_websocket_handler.subscribe("test_channel", "client1")
+
+    # Try to unsubscribe from non-existent channel
+    test_websocket_handler.unsubscribe("nonexistent_channel", "client1")
+
+    # Try to unsubscribe non-existent client
+    test_websocket_handler.unsubscribe("test_channel", "nonexistent_client")
+
+    # Verify no errors were raised and handler is still in valid state
+    assert test_websocket_handler.has_subscribers("test_channel")
+
+
+@pytest.mark.asyncio
+async def test_websocket_handler_connection_error_handling(test_websocket_handler):
+    """Test connection error handling."""
+    # Verify immediate failure for websocket handler
+    result = await test_websocket_handler._handle_connection_error("test_id")
+    assert result is False
+
+
+@pytest.mark.asyncio
+async def test_websocket_handler_stop(test_websocket_handler):
+    """Test stop method."""
+    # Create a task to stop
+    test_websocket_handler._run_task = asyncio.create_task(asyncio.sleep(1))
+    test_websocket_handler._logger.info = MagicMock()
+
+    # Stop the handler
+    await test_websocket_handler.stop()
+
+    # Verify task was cancelled
+    assert test_websocket_handler._run_task.cancelled()
+    test_websocket_handler._logger.info.assert_called_with(
+        f"Interface {test_websocket_handler._name} stopped."
+    )
