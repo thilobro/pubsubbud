@@ -49,7 +49,6 @@ class MqttHandler(HandlerInterface):
         self._client = mqtt.Client()
         self._client.on_message = self._on_message
         self._client.connect(self._host, port=self._port)
-        self._client.loop_start()
         self._run_task: Optional[asyncio.Task] = None
 
     def _on_message(
@@ -71,9 +70,14 @@ class MqttHandler(HandlerInterface):
             message: The MQTT message to add to the queue
         """
         if isinstance(message.payload, bytes):
-            await self._message_queue.put(
-                BrokerMessage(**json.loads(message.payload.decode()))
-            )
+            try:
+                payload = json.loads(message.payload.decode())
+                try:
+                    await self._message_queue.put(BrokerMessage(**payload))
+                except (TypeError, KeyError) as e:
+                    self._logger.warning(f"Invalid message format: {str(e)}")
+            except json.JSONDecodeError:
+                self._logger.warning("Invalid JSON payload received")
 
     def run(self) -> None:
         """Start the MQTT client and subscribe to the base topic."""
