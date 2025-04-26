@@ -185,3 +185,155 @@ async def test_mqtt_send_message():
                 {"data": "test"},
                 {"message_id": "msg1", "origin_id": "test_client"},
             )
+
+
+@pytest.mark.asyncio
+async def test_mqtt_handler_message_queue():
+    """Test message queue handling and error cases."""
+    logger = MagicMock()
+    config = MqttHandlerConfig(
+        host="localhost",
+        port=1883,
+        to_pubsub_topic="test_in",
+        from_pubsub_topic="test_out",
+    )
+
+    with patch("paho.mqtt.client.Client") as mock_client_class:
+        mock_client = MagicMock()
+        mock_client_class.return_value = mock_client
+
+        handler = MqttHandler("test", config, logger)
+
+        # Test non-bytes payload (line 65)
+        message = MagicMock()
+        message.payload = "not bytes"
+        await handler._add_message_to_queue(message)
+
+        # Test run and subscribe (lines 80-81)
+        handler.run()
+        mock_client.subscribe.assert_called_once_with("test_in")
+        mock_client.loop_start.assert_called_once()
+
+        # Test unsubscribe with non-existent channel (lines 85-91)
+        handler.unsubscribe(channel_name="nonexistent")
+        logger.warning.assert_called_with(
+            "Attempted to unsubscribe from non-existent channel: nonexistent"
+        )
+
+
+@pytest.mark.asyncio
+async def test_mqtt_handler_unsubscribe_scenarios():
+    """Test various unsubscribe scenarios."""
+    logger = MagicMock()
+    config = MqttHandlerConfig(
+        host="localhost",
+        port=1883,
+        to_pubsub_topic="test_in",
+        from_pubsub_topic="test_out",
+    )
+
+    with patch("paho.mqtt.client.Client") as mock_client_class:
+        mock_client = MagicMock()
+        mock_client_class.return_value = mock_client
+
+        handler = MqttHandler("test", config, logger)
+
+        # Setup subscriptions
+        handler.subscribe("channel1", "client1")
+        handler.subscribe("channel2", "client1")
+        handler.subscribe("channel1", "client2")
+
+        # Test unsubscribe with both channel and handler_id
+        handler.unsubscribe(channel_name="channel1", handler_id="client1")
+        mock_client.unsubscribe.assert_called_with("test_in/client1")
+
+        # Test unsubscribe with only handler_id
+        handler.unsubscribe(handler_id="client2")
+        mock_client.unsubscribe.assert_called_with("test_in/client2")
+
+        # Test unsubscribe with only channel_name
+        handler.unsubscribe(channel_name="channel2")
+        assert "channel2" not in handler._subscribed_channels
+
+
+@pytest.mark.asyncio
+async def test_mqtt_handler_stop_behavior():
+    """Test stop behavior with and without run task."""
+    logger = MagicMock()
+    config = MqttHandlerConfig(
+        host="localhost",
+        port=1883,
+        to_pubsub_topic="test_in",
+        from_pubsub_topic="test_out",
+    )
+
+    with patch("paho.mqtt.client.Client") as mock_client_class:
+        mock_client = MagicMock()
+        mock_client_class.return_value = mock_client
+
+        handler = MqttHandler("test", config, logger)
+
+        # Test stop without run task
+        await handler.stop()
+        logger.info.assert_not_called()
+
+        # Test stop with run task
+        class MockTask:
+            def __init__(self):
+                self.cancel = MagicMock()
+
+            def __await__(self):
+                return iter([None])
+
+        mock_task = MockTask()
+        handler._run_task = mock_task
+
+        await handler.stop()
+        mock_task.cancel.assert_called_once()
+        logger.info.assert_called_with("Interface test stopped.")
+
+
+@pytest.mark.asyncio
+async def test_mqtt_handler_invalid_message():
+    """Test handling of invalid messages."""
+    logger = MagicMock()
+    config = MqttHandlerConfig(
+        host="localhost",
+        port=1883,
+        to_pubsub_topic="test_in",
+        from_pubsub_topic="test_out",
+    )
+
+    with patch("paho.mqtt.client.Client") as mock_client_class:
+        mock_client = MagicMock()
+        mock_client_class.return_value = mock_client
+
+        handler = MqttHandler("test", config, logger)
+        handler.run()
+
+        # Create a mock MQTT message with invalid JSON payload
+        invalid_message = MagicMock()
+        invalid_message.payload = b"invalid json"
+        await handler._add_message_to_queue(invalid_message)
+        assert handler._message_queue.empty()
+
+        # Test valid message
+        valid_message = MagicMock()
+        valid_message.payload = json.dumps(
+            {
+                "header": {
+                    "message_id": "test_id",
+                    "channel": "test_channel",
+                    "origin_id": "test_origin",
+                    "type": "test",
+                },
+                "content": {"data": "test"},
+            }
+        ).encode()
+        await handler._add_message_to_queue(valid_message)
+        assert not handler._message_queue.empty()
+        received_message = await handler._message_queue.get()
+        assert received_message.content == {"data": "test"}
+        assert received_message.header.message_id == "test_id"
+
+        await handler.stop()

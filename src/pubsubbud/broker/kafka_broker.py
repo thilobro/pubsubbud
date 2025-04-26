@@ -60,7 +60,7 @@ class KafkaBroker(BrokerInterface):
         """
         channel_name = channel_name.replace("/", ".")
         subscriptions = self._consumer.subscription()
-        new_topics = subscriptions - channel_name
+        new_topics = subscriptions - {channel_name}
         self._consumer.unsubscribe(list(new_topics))
 
     async def publish(self, channel_name: str, message: str) -> None:
