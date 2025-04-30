@@ -1,0 +1,114 @@
+services:
+  redis:
+    image: redis:latest
+    ports:
+      - "6379:6379"
+    networks:
+      - pubsubbud-network
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: [ "CMD", "redis-cli", "ping" ]
+      interval: 5s
+      timeout: 3s
+      retries: 3
+
+  mqtt:
+    image: eclipse-mosquitto:latest
+    ports:
+      - "1883:1883" # MQTT
+      - "9001:9001" # WebSocket
+    networks:
+      - pubsubbud-network
+    volumes:
+      - mosquitto-data:/mosquitto/data
+      - mosquitto-log:/mosquitto/log
+      - ./configs/mosquitto.conf:/mosquitto/config/mosquitto.conf
+    healthcheck:
+      test: [ "CMD", "mosquitto_pub", "-t", "$$", "-m", "test", "-q", "0" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  kafka:
+    image: confluentinc/cp-kafka:7.5.0
+    ports:
+      - "9092:9092"
+      - "29092:29092"
+      - "29093:29093"
+    environment:
+      KAFKA_NODE_ID: 1
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT,EXTERNAL:PLAINTEXT
+      KAFKA_LISTENERS: CONTROLLER://kafka:29092,PLAINTEXT://kafka:29093,EXTERNAL://0.0.0.0:9092
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:29093,EXTERNAL://localhost:9092
+      KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+      KAFKA_PROCESS_ROLES: broker,controller
+      KAFKA_CONTROLLER_QUORUM_VOTERS: 1@kafka:29092
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true"
+      CLUSTER_ID: MkU3OEVBNTcwNTJENDM2Qk
+      KAFKA_LOG_DIRS: /var/lib/kafka/data
+      KAFKA_BROKER_ID: 1
+      KAFKA_ZOOKEEPER_CONNECT: ""
+      KAFKA_OFFSETS_TOPIC_NUM_PARTITIONS: 1
+      KAFKA_DELETE_TOPIC_ENABLE: "true"
+      KAFKA_LOG_RETENTION_HOURS: 168
+      KAFKA_LOG_SEGMENT_BYTES: 1073741824
+      KAFKA_LOG_RETENTION_CHECK_INTERVAL_MS: 300000
+      KAFKA_LOG_CLEANER_ENABLE: "true"
+      KAFKA_LOG_CLEANER_DELETE_RETENTION_MS: 86400000
+      KAFKA_LOG_CLEANER_MIN_COMPACTION_LAG_MS: 0
+      KAFKA_LOG_CLEANER_MIN_CLEANABLE_RATIO: 0.5
+      KAFKA_LOG_CLEANER_THREADS: 1
+      KAFKA_LOG_CLEANER_IO_BUFFER_SIZE: 524288
+      KAFKA_LOG_CLEANER_DEDUPE_BUFFER_SIZE: 134217728
+      KAFKA_LOG_CLEANER_IO_MAX_BYTES_PER_SECOND: 1.7976931348623157e+308
+      KAFKA_LOG_CLEANER_BACKOFF_MS: 15000
+    networks:
+      - pubsubbud-network
+    volumes:
+      - kafka-data:/var/lib/kafka/data
+    healthcheck:
+      test: [ "CMD-SHELL", "kafka-topics --bootstrap-server kafka:9092 --list || exit 0" ]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+
+  test-server:
+    build:
+      context: ../../
+      dockerfile: ./examples/test_server/Dockerfile
+    volumes:
+      - ./configs:/app/examples/test_server/configs
+    ports:
+      - "8765:8765" # WebSocket port
+    environment:
+      - BROKER_TYPE=redis
+    depends_on:
+      redis:
+        condition: service_healthy
+      mqtt:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+    networks:
+      - pubsubbud-network
+
+volumes:
+  redis-data:
+    driver: local
+  mosquitto-data:
+    driver: local
+  mosquitto-log:
+    driver: local
+  kafka-data:
+    driver: local
+
+networks:
+  pubsubbud-network:
+    driver: bridge

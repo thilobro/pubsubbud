@@ -1,0 +1,6 @@
+{
+    "host": "kafka",
+    "port": 9092,
+    "to_pubsub_topic": "kafka/to_pubsub",
+    "from_pubsub_topic": "kafka/from_pubsub"
+}

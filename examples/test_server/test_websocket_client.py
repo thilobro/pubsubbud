@@ -20,8 +20,14 @@ Usage:
 
 import asyncio
 import json
+import os
 
 from websockets.asyncio.client import connect
+
+# Get host and port from environment variables or use defaults
+HOST = os.getenv("WEBSOCKET_HOST", "localhost")
+PORT = os.getenv("WEBSOCKET_PORT", "8765")
+WS_URL = f"ws://{HOST}:{PORT}"
 
 test_msg = {
     "header": {"message_id": "0", "channel": "test"},
@@ -51,7 +57,8 @@ test_unsub_msg = {
 
 
 async def hello():
-    async with connect("ws://localhost:8765") as websocket:
+    print(f"Connecting to WebSocket server at {WS_URL}")
+    async with connect(WS_URL) as websocket:
         test_msg["header"]["origin_id"] = str(websocket.id)
         test_sub_msg["header"]["origin_id"] = str(websocket.id)
         test_unsub_msg["header"]["origin_id"] = str(websocket.id)
