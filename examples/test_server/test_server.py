@@ -30,6 +30,7 @@ Configuration:
 
 import asyncio
 import logging
+import os
 from typing import Any
 
 from pubsubbud.broker.kafka_broker import KafkaBroker
@@ -46,7 +47,7 @@ from pubsubbud.config import (
 from pubsubbud.handler import kafka_handler, mqtt_handler, websocket_handler
 from pubsubbud.pubsub_manager import PubsubManager
 
-BROKER_TYPE = "kafka"
+BROKER_TYPE = os.getenv("BROKER_TYPE", "redis")
 
 
 async def callback(content: dict[str, Any], header: dict[str, Any]) -> None:
@@ -65,7 +66,6 @@ async def main() -> None:
     logger = logging.getLogger("test_logger")
     logging.basicConfig(level=logging.INFO)
 
-    pubsub_handler_config_path = "./configs/pubsub.json"
     if BROKER_TYPE == "redis":
         redis_broker_config_path = "./configs/redis_broker.json"
         config = RedisBrokerConfig.from_json(redis_broker_config_path)

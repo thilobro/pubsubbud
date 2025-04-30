@@ -1,0 +1,6 @@
+{
+    "host": "mqtt",
+    "port": 1883,
+    "to_pubsub_topic": "mqtt/to_pubsub",
+    "from_pubsub_topic": "mqtt/from_pubsub"
+}

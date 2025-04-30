@@ -2,34 +2,17 @@
 
 This directory contains various examples demonstrating different aspects and use cases of the pubsubbud library.
 
-## Quick Examples
+## Examples
 
-### `test_kafka.py`
-Demonstrates basic Kafka integration with pubsubbud:
-- Setting up async Kafka producer and consumer
-- Creating subscription messages
-- Sending messages to Kafka topics
-
-### `test_mqtt_client.py`
-Shows MQTT client integration:
-- Connecting to an MQTT broker
-- Subscribing to topics with unique IDs
-- Publishing and receiving messages
-
-### `test_websocket_client.py`
-Illustrates WebSocket client functionality:
-- Connecting to a WebSocket server
-- Sending different message types (regular, subscription, unsubscription)
-- Handling message responses
-
-### `test_server.py`
-Provides a complete server setup example:
+### `test_server/`
+A complete server setup with Docker support:
 - Configurable broker selection (Redis, MQTT, Kafka)
 - Multiple protocol handler integration
-- Callback registration
-- Message publishing
+- Docker Compose setup for all brokers
+- WebSocket, MQTT, and Kafka client examples
+- Environment-based configuration
 
-## Complete Application Example
+See the [Test Server README](test_server/README.md) for detailed information about this example.
 
 ### `cli_chat/`
 A full-featured command-line chat application demonstrating real-world usage:
@@ -51,17 +34,13 @@ Each example has specific requirements and setup instructions documented in its 
 
 Example:
 ```bash
-# For Kafka example
-poetry run python test_kafka.py
+# For test server example
+cd test_server
+docker compose -f docker-compose.yml up
 
-# For MQTT example
-poetry run python test_mqtt_client.py
-
-# For WebSocket example
-poetry run python test_websocket_client.py
-
-# For complete server example
-poetry run python test_server.py
+# For CLI chat example
+cd cli_chat
+docker compose up
 ```
 
 ## Configuration
