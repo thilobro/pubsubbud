@@ -26,3 +26,14 @@ The function takes:
 Returns:
     A coroutine that completes when the callback processing is done.
 """
+
+ContentValidationCallback = Callable[[dict[str, Any]], bool]
+"""Type alias for message content validation callback functions.
+
+This type represents a callback function that is called when messages from the handler are validated.
+The function takes:
+- Message content (dict[str, Any])
+
+Returns:
+    A bool that is True when the content can be validated.
+"""

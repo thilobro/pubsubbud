@@ -1,9 +1,18 @@
 import asyncio
 import http
 import json
+import logging
+import uuid
+from typing import Any, Optional
 from unittest.mock import AsyncMock, MagicMock, call
 
 import pytest
+
+from pubsubbud.handler.handler_interface import (
+    ContentValidationCallback,
+    HandlerInterface,
+)
+from pubsubbud.models import BrokerMessage
 
 
 @pytest.mark.asyncio
@@ -651,3 +660,239 @@ async def test_forward_to_nonexistent_handler(test_pubsub_manager):
     mock_logger.warning.assert_called_once_with(
         "Unable to forward to handler nonexistent_handler with id client1. Handler not found."
     )
+
+
+@pytest.mark.asyncio
+async def test_validation_callback_in_pubsub_manager(test_pubsub_manager):
+    """Test validation callback in PubsubManager."""
+
+    # Setup validation callback
+    def validation_callback(content: dict) -> bool:
+        return "valid" in content
+
+    # Create a test handler with validation
+    handler = TestHandler(
+        name="test",
+        publish_callback=AsyncMock(),
+        logger=logging.getLogger("test_logger"),
+        content_validation_callback=validation_callback,
+    )
+    test_pubsub_manager.add_handler(handler)
+
+    # Subscribe handler to test channel
+    handler.subscribe("test_channel", "test_client")
+
+    # Create test messages
+    valid_message = BrokerMessage(
+        channel="test_channel",
+        content={"valid": True},
+        header={
+            "message_id": str(uuid.uuid4()),
+            "channel": "test_channel",
+            "origin_id": "test_origin",
+        },
+    )
+    invalid_message = BrokerMessage(
+        channel="test_channel",
+        content={"invalid": True},
+        header={
+            "message_id": str(uuid.uuid4()),
+            "channel": "test_channel",
+            "origin_id": "test_origin",
+        },
+    )
+
+    # Process messages directly through forward_to_handlers
+    await test_pubsub_manager.forward_to_handlers(
+        "test_channel",
+        valid_message.content,
+        valid_message.header,
+    )
+    await test_pubsub_manager.forward_to_handlers(
+        "test_channel",
+        invalid_message.content,
+        invalid_message.header,
+    )
+
+    # Verify handler received valid message
+    assert handler._publish_callback.call_count == 1
+
+
+@pytest.mark.asyncio
+async def test_validation_error_handling(test_pubsub_manager):
+    """Test error handling for validation failures."""
+
+    # Setup validation callback
+    def validation_callback(content: dict) -> bool:
+        return "valid" in content
+
+    # Create a test handler with validation
+    handler = TestHandler(
+        name="test",
+        publish_callback=AsyncMock(),
+        logger=logging.getLogger("test_logger"),
+        content_validation_callback=validation_callback,
+    )
+    test_pubsub_manager.add_handler(handler)
+
+    # Create an invalid message
+    invalid_message = BrokerMessage(
+        channel="test_channel",
+        content={"invalid": True},
+        header={
+            "message_id": "test_id",
+            "channel": "test_channel",
+            "origin_id": "test_origin",
+        },
+    )
+
+    # Test message processing
+    await test_pubsub_manager._handle_pubsub_message(invalid_message)
+
+    # Verify error handling
+    assert handler._publish_callback.call_count == 0
+
+
+@pytest.mark.asyncio
+async def test_multiple_handlers_validation(test_pubsub_manager):
+    """Test validation with multiple handlers."""
+
+    # Setup validation callbacks
+    def validation_callback1(content: dict) -> bool:
+        return "valid1" in content
+
+    def validation_callback2(content: dict) -> bool:
+        return "valid2" in content
+
+    # Create test handlers with different validation rules
+    handler1 = TestHandler(
+        name="test1",
+        publish_callback=AsyncMock(),
+        logger=logging.getLogger("test_logger"),
+        content_validation_callback=validation_callback1,
+    )
+    handler2 = TestHandler(
+        name="test2",
+        publish_callback=AsyncMock(),
+        logger=logging.getLogger("test_logger"),
+        content_validation_callback=validation_callback2,
+    )
+    test_pubsub_manager.add_handler(handler1)
+    test_pubsub_manager.add_handler(handler2)
+
+    # Subscribe handlers to test channel
+    handler1.subscribe("test_channel", "test_client1")
+    handler2.subscribe("test_channel", "test_client2")
+
+    # Create test messages
+    message1 = BrokerMessage(
+        channel="test_channel",
+        content={"valid1": True},
+        header={
+            "message_id": str(uuid.uuid4()),
+            "channel": "test_channel",
+            "origin_id": "test_origin",
+        },
+    )
+    message2 = BrokerMessage(
+        channel="test_channel",
+        content={"valid2": True},
+        header={
+            "message_id": str(uuid.uuid4()),
+            "channel": "test_channel",
+            "origin_id": "test_origin",
+        },
+    )
+
+    # Process messages directly through forward_to_handlers
+    await test_pubsub_manager.forward_to_handlers(
+        "test_channel",
+        message1.content,
+        message1.header,
+    )
+    await test_pubsub_manager.forward_to_handlers(
+        "test_channel",
+        message2.content,
+        message2.header,
+    )
+
+    # Verify each handler only processes its valid messages
+    assert handler1._publish_callback.call_count == 1
+    assert handler2._publish_callback.call_count == 1
+    # Verify the correct message content was processed
+    handler1._publish_callback.assert_awaited_with(
+        "test_client1",
+        {"valid1": True},
+        message1.header.dict(),
+    )
+    handler2._publish_callback.assert_awaited_with(
+        "test_client2",
+        {"valid2": True},
+        message2.header.dict(),
+    )
+
+
+class TestHandler(HandlerInterface):
+    """Test implementation of HandlerInterface for testing."""
+
+    def __init__(
+        self,
+        name: str,
+        publish_callback: AsyncMock,
+        logger: logging.Logger,
+        content_validation_callback: Optional[ContentValidationCallback] = None,
+    ) -> None:
+        """Initialize the test handler."""
+        super().__init__(name, publish_callback, logger, content_validation_callback)
+        self._publish_callback = publish_callback
+        self.subscriptions = {}
+
+    async def start(self) -> None:
+        """Start the handler."""
+        pass
+
+    async def stop(self) -> None:
+        """Stop the handler."""
+        pass
+
+    async def publish(self, channel: str, content: dict) -> None:
+        """Publish a message."""
+        pass
+
+    def run(self) -> None:
+        """Run the handler."""
+        pass
+
+    def subscribe(self, channel_name: str, handler_id: str) -> None:
+        """Subscribe to a channel."""
+        if channel_name not in self.subscriptions:
+            self.subscriptions[channel_name] = set()
+        self.subscriptions[channel_name].add(handler_id)
+
+    def unsubscribe(self, channel_name: str, handler_id: Optional[str] = None) -> None:
+        """Unsubscribe from a channel."""
+        if channel_name in self.subscriptions:
+            if handler_id:
+                self.subscriptions[channel_name].discard(handler_id)
+            else:
+                del self.subscriptions[channel_name]
+
+    def has_subscribers(self, channel_name: str) -> bool:
+        """Check if a channel has subscribers."""
+        return channel_name in self.subscriptions and bool(
+            self.subscriptions[channel_name]
+        )
+
+    async def publish_if_subscribed(
+        self, channel_name: str, content: dict[str, Any], header: dict[str, Any]
+    ) -> None:
+        """Publish a message to all subscribers of a channel."""
+        if self.has_subscribers(channel_name):
+            # Validate content if validation callback is set
+            if (
+                self._content_validation_callback
+                and not self._content_validation_callback(content)
+            ):
+                return
+            for handler_id in self.subscriptions[channel_name]:
+                await self._publish_callback(handler_id, content, header)

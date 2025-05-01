@@ -86,6 +86,42 @@ Pattern matching supports:
 - `[seq]`: Matches any character in seq
 - `[!seq]`: Matches any character not in seq
 
+### Message Validation
+
+PubsubBud supports content validation through validation callbacks. These callbacks can be used to ensure messages meet specific requirements before being processed:
+
+```python
+# Define a validation callback
+def validate_temperature(content: dict) -> bool:
+    # Ensure temperature is within valid range
+    return -50 <= content.get('temperature', 0) <= 150
+
+# Create a handler with validation
+handler = WebsocketHandler(
+    name="temperature_handler",
+    config=config,
+    logger=logger,
+    content_validation_callback=validate_temperature
+)
+
+# Add handler to pubsub manager
+pubsub_manager.add_handler(handler)
+
+# Subscribe to temperature channel
+handler.subscribe("temperature", "client1")
+
+# Only messages with valid temperature values will be processed
+# Invalid messages will be silently dropped
+```
+
+Validation callbacks can be used to:
+- Validate data types and ranges
+- Check required fields
+- Enforce business rules
+- Filter unwanted messages
+
+Multiple handlers can have different validation rules for the same channel, allowing for protocol-specific validation requirements.
+
 Check the `examples/` directory for:
 - Basic usage examples
 - Different broker configurations
