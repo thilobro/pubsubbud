@@ -3,7 +3,8 @@ import logging
 from abc import ABC, abstractmethod
 from typing import Any, AsyncIterable, Optional
 
-from pubsubbud.custom_types import HandlerPublishCallback
+from pubsubbud.custom_types import ContentValidationCallback, HandlerPublishCallback
+from pubsubbud.exceptions import MessageValidationError
 from pubsubbud.models import BrokerMessage
 
 
@@ -34,6 +35,7 @@ class HandlerInterface(ABC):
         name: str,
         publish_callback: HandlerPublishCallback,
         logger: logging.Logger,
+        content_validation_callback: Optional[ContentValidationCallback] = None,
     ) -> None:
         """Initialize the handler.
 
@@ -47,6 +49,7 @@ class HandlerInterface(ABC):
         self._message_queue: asyncio.Queue[BrokerMessage] = asyncio.Queue(maxsize=100)
         self._publish_callback = publish_callback
         self._subscribed_channels: dict[str, list[str]] = {}
+        self._content_validation_callback = content_validation_callback
 
     def subscribe(self, channel_name: str, handler_id: str) -> None:
         """Subscribe a client to a channel.
@@ -85,7 +88,7 @@ class HandlerInterface(ABC):
             - If both channel_name and handler_id are provided, only that specific subscription is removed
             - If only handler_id is provided, the client is unsubscribed from all channels
         """
-        channels_to_remove = []
+        channels_to_remove: list[str] = []
         if channel_name and not handler_id:
             try:
                 del self._subscribed_channels[channel_name]
@@ -180,7 +183,24 @@ class HandlerInterface(ABC):
         """
         while True:
             message = await self._message_queue.get()
-            yield message
+            try:
+                self._validate_message(message)
+                yield message
+            except MessageValidationError:
+                self._logger.warning(f"Unable to validate message: {message}.")
+                raise
+
+    def _validate_message(self, message: BrokerMessage) -> None:
+        """Validate the message coming from a client if there is a validation callback set.
+
+        Args:
+            message: Message from the client pulled from message queue
+        """
+        content = message.content
+        if self._content_validation_callback and not self._content_validation_callback(
+            content
+        ):
+            raise MessageValidationError
 
     @abstractmethod
     async def stop(self) -> None:

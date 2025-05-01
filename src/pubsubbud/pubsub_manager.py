@@ -9,6 +9,7 @@ from typing import Any, Optional
 
 from pubsubbud.broker.broker_interface import BrokerInterface
 from pubsubbud.custom_types import PubsubCallback
+from pubsubbud.exceptions import MessageValidationError
 from pubsubbud.handler.handler_interface import HandlerInterface
 from pubsubbud.helpers import create_header
 from pubsubbud.models import BrokerMessage
@@ -282,6 +283,11 @@ class PubsubManager:
                 ack_header = {
                     "ack_id": message_id,
                     "status_code": http.HTTPStatus.OK,
+                }
+            except MessageValidationError:
+                ack_header = {
+                    "ack_id": message_id,
+                    "status_code": http.HTTPStatus.UNPROCESSABLE_ENTITY,
                 }
             except Exception:
                 ack_header = {

@@ -1,7 +1,7 @@
 """Custom exceptions for the pubsubbud package."""
 
 
-class ValidationError(Exception):
+class MessageValidationError(Exception):
     """Raised when a message fails validation."""
 
     pass
